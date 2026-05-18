@@ -2,21 +2,21 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 // URL do seu backend
-const API_URL = 'http://10.200.32.246:3000/api/usuarios';
+const API_URL = 'http://10.200.32.7:3000/api/usuarios';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
