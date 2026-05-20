@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 // URL do backend
-const API_URL = 'http://10.200.32.7:3000/api';
+const API_URL = 'http://10.16.136.95:3000/api';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);

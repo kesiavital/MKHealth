@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 
 // URL do seu backend
-const API_URL = 'http://10.200.32.7:3000/api/usuarios';
+const API_URL = 'http://10.16.136.95:3000/api/usuarios';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
