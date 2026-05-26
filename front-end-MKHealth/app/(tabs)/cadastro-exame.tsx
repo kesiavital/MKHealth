@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 
 
-const API_URL = 'http://192.168.0.13:3000/api/exames/';  
+const API_URL = 'http://172.17.20.72:3000/api/exames/';  
 
 // Lista de exames comuns
 const commonExams = [

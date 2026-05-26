@@ -1,370 +1,418 @@
 // app/(tabs)/exames.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Linking,
-  Modal,
-  ScrollView,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useExames } from '../_context/ExamesContext';
+
+// URL da API
+const API_URL = 'http://172.17.20.72:3000/api/exames';
+
+interface Exame {
+  id: number;
+  paciente_nome: string;
+  tipo_exame: string;
+  data_exame: string;
+  medico_solicitante: string;
+  laboratorio: string;
+  resultados: string | null;
+  observacoes: string | null;
+  possui_pdf: boolean;
+  pdf_nome: string | null;
+  pdf_tamanho: number | null;
+  pdf_path: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function ExamesScreen() {
-  const { listaExames, loading, carregarExames, deletarExame } = useExames();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedExame, setSelectedExame] = useState<any>(null);
+  const [listaExames, setListaExames] = useState<Exame[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Função para abrir o PDF
-  const abrirPDF = async (pdfPath: string, nomeArquivo: string) => {
-    if (!pdfPath) {
-      Alert.alert('Ops', 'Este exame não possui arquivo anexado.');
-      return;
-    }
-
+  const carregarExames = async () => {
+    console.log('🔄 Carregando exames...');
+    setLoading(true);
     try {
-      // URL completa do PDF
-      const pdfUrl = `http://192.168.0.13:3000${pdfPath}`;
-      console.log('📄 Abrindo PDF:', pdfUrl);
-      
-      // Abrir URL diretamente
-      const canOpen = await Linking.canOpenURL(pdfUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(pdfUrl);
-      } else {
-        Alert.alert('Erro', 'Não foi possível abrir o PDF.');
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📡 Status:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
       }
+
+      const data = await response.json();
+      console.log(`✅ ${data.length} exames carregados`);
+      setListaExames(data);
     } catch (error) {
-      console.error('❌ Erro ao abrir PDF:', error);
-      Alert.alert('Erro', 'Não foi possível abrir o PDF. Verifique sua conexão.');
+      console.error('❌ Erro ao carregar exames:', error);
+      Alert.alert('Erro', 'Não foi possível carregar a lista de exames');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Função para visualizar detalhes do exame
-  const verDetalhes = (exame: any) => {
-    setSelectedExame(exame);
-    setModalVisible(true);
+  const deletarExame = async (id: number) => {
+    try {
+      console.log(`🗑️ Deletando exame ${id}...`);
+      
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao deletar exame');
+      }
+
+      Alert.alert('Sucesso', 'Exame deletado com sucesso!');
+      await carregarExames(); // Recarrega a lista
+    } catch (error) {
+      console.error('❌ Erro ao deletar exame:', error);
+      Alert.alert('Erro', 'Não foi possível deletar o exame');
+    }
   };
 
-  // Função para confirmar deleção
-  const confirmarDelecao = (id: number, nome: string) => {
+  // Recarregar exames sempre que a tela ganhar foco
+  useFocusEffect(
+    useCallback(() => {
+      carregarExames();
+    }, [])
+  );
+
+  const handleDelete = (id: number, pacienteNome: string) => {
     Alert.alert(
-      'Confirmar Deleção',
-      `Tem certeza que deseja deletar o exame de ${nome}?`,
+      'Confirmar exclusão',
+      `Deseja realmente excluir o exame de ${pacienteNome}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
-          text: 'Deletar', 
-          style: 'destructive',
-          onPress: () => deletarExame(id)
-        }
+          text: 'Excluir', 
+          onPress: () => deletarExame(id),
+          style: 'destructive'
+        },
       ]
     );
   };
 
-  // Formatar data para exibição
   const formatarData = (dataString: string) => {
     const data = new Date(dataString);
     return data.toLocaleDateString('pt-BR');
   };
 
-  // Formatar tamanho do arquivo
-  const formatarTamanho = (bytes: number | null) => {
-    if (!bytes) return 'Desconhecido';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  // Renderizar item da lista
-  const renderItem = ({ item }: { item: any }) => (
+  const renderExameCard = ({ item }: { item: Exame }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.iconContainer}>
-          <MaterialCommunityIcons name="file-document-outline" size={30} color="#8B0000" />
-        </View>
-        <View style={styles.infoContainer}>
+        <View style={styles.pacienteInfo}>
+          <MaterialCommunityIcons name="account-circle" size={28} color="#8B0000" />
           <Text style={styles.pacienteNome}>{item.paciente_nome}</Text>
-          <Text style={styles.exameTipo}>{item.tipo_exame}</Text>
-          <Text style={styles.data}>Data: {formatarData(item.data_exame)}</Text>
-          <Text style={styles.medico}>Médico: {item.medico_solicitante}</Text>
-          <Text style={styles.laboratorio}>Laboratório: {item.laboratorio}</Text>
         </View>
+        <TouchableOpacity
+          onPress={() => handleDelete(item.id, item.paciente_nome)}
+          style={styles.deleteButton}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF4444" />
+        </TouchableOpacity>
       </View>
 
-      {/* Resultados (se houver) */}
-      {item.resultados && (
-        <View style={styles.resultadosContainer}>
-          <Text style={styles.resultadosLabel}>Resultados:</Text>
-          <Text style={styles.resultadosText} numberOfLines={2}>
-            {item.resultados}
-          </Text>
+      <View style={styles.cardContent}>
+        <View style={styles.infoRow}>
+          <MaterialCommunityIcons name="flask" size={20} color="#666" />
+          <Text style={styles.infoLabel}>Tipo de Exame:</Text>
+          <Text style={styles.infoValue}>{item.tipo_exame}</Text>
         </View>
-      )}
 
-      {/* Botões de ação */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.detalhesButton}
-          onPress={() => verDetalhes(item)}
-        >
-          <MaterialCommunityIcons name="eye-outline" size={20} color="#555" />
-          <Text style={styles.detalhesButtonText}>Detalhes</Text>
-        </TouchableOpacity>
+        <View style={styles.infoRow}>
+          <MaterialCommunityIcons name="calendar" size={20} color="#666" />
+          <Text style={styles.infoLabel}>Data:</Text>
+          <Text style={styles.infoValue}>{formatarData(item.data_exame)}</Text>
+        </View>
 
-        {item.possui_pdf && (
-          <TouchableOpacity 
-            style={styles.pdfButton}
-            onPress={() => abrirPDF(item.pdf_path, item.pdf_nome || 'exame.pdf')}
-          >
-            <MaterialCommunityIcons name="file-pdf-box" size={20} color="#FFF" />
-            <Text style={styles.pdfButtonText}>Ver PDF</Text>
-          </TouchableOpacity>
+        <View style={styles.infoRow}>
+          <MaterialCommunityIcons name="doctor" size={20} color="#666" />
+          <Text style={styles.infoLabel}>Médico:</Text>
+          <Text style={styles.infoValue}>{item.medico_solicitante}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <MaterialCommunityIcons name="test-tube" size={20} color="#666" />
+          <Text style={styles.infoLabel}>Laboratório:</Text>
+          <Text style={styles.infoValue}>{item.laboratorio}</Text>
+        </View>
+
+        {item.resultados && (
+          <View style={styles.resultadosContainer}>
+            <MaterialCommunityIcons name="file-document-outline" size={20} color="#666" />
+            <Text style={styles.resultadosLabel}>Resultados:</Text>
+            <Text style={styles.resultadosText}>{item.resultados}</Text>
+          </View>
         )}
 
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={() => confirmarDelecao(item.id, item.paciente_nome)}
-        >
-          <MaterialCommunityIcons name="delete-outline" size={20} color="#FFF" />
-          <Text style={styles.deleteButtonText}>Deletar</Text>
-        </TouchableOpacity>
+        {item.observacoes && (
+          <View style={styles.observacoesContainer}>
+            <MaterialCommunityIcons name="note-text-outline" size={20} color="#666" />
+            <Text style={styles.observacoesLabel}>Observações:</Text>
+            <Text style={styles.observacoesText}>{item.observacoes}</Text>
+          </View>
+        )}
+
+        {item.possui_pdf && (
+          <View style={styles.pdfBadge}>
+            <MaterialCommunityIcons name="file-pdf-box" size={18} color="#FF0000" />
+            <Text style={styles.pdfText}>PDF Anexado</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.cardFooter}>
+        <Text style={styles.dataCriacao}>
+          Criado em: {new Date(item.created_at).toLocaleDateString('pt-BR')}
+        </Text>
       </View>
     </View>
   );
 
   if (loading && listaExames.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Meus Exames</Text>
-        </View>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#8B0000" />
-          <Text style={styles.loadingText}>Carregando exames...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#8B0000" />
+        <Text style={styles.loadingText}>Carregando exames...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
+        <MaterialCommunityIcons name="clipboard-list" size={32} color="#8B0000" />
         <Text style={styles.headerTitle}>Meus Exames</Text>
-        <Text style={styles.headerSubtitle}>{listaExames.length} exames cadastrados</Text>
+        <Text style={styles.headerSubtitle}>
+          {listaExames.length} {listaExames.length === 1 ? 'exame encontrado' : 'exames encontrados'}
+        </Text>
       </View>
 
       <FlatList
         data={listaExames}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
+        renderItem={renderExameCard}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={carregarExames}
+            colors={['#8B0000']}
+            tintColor="#8B0000"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="file-document-outline" size={80} color="#CCC" />
-            <Text style={styles.emptyText}>Nenhum exame encontrado</Text>
-            <Text style={styles.emptySubtext}>Cadastre seu primeiro exame</Text>
+            <MaterialCommunityIcons name="clipboard-text-outline" size={80} color="#CCCCCC" />
+            <Text style={styles.emptyTitle}>Nenhum exame encontrado</Text>
+            <Text style={styles.emptyText}>
+              Clique no botão "+" para adicionar seu primeiro exame
+            </Text>
           </View>
         }
-        renderItem={renderItem}
-        onRefresh={carregarExames}
-        refreshing={loading}
       />
-
-      {/* Modal de detalhes */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detalhes do Exame</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            {selectedExame && (
-              <ScrollView style={styles.modalBody}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Paciente:</Text>
-                  <Text style={styles.detailValue}>{selectedExame.paciente_nome}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Tipo de Exame:</Text>
-                  <Text style={styles.detailValue}>{selectedExame.tipo_exame}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Data do Exame:</Text>
-                  <Text style={styles.detailValue}>{formatarData(selectedExame.data_exame)}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Médico Solicitante:</Text>
-                  <Text style={styles.detailValue}>{selectedExame.medico_solicitante}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Laboratório:</Text>
-                  <Text style={styles.detailValue}>{selectedExame.laboratorio}</Text>
-                </View>
-                {selectedExame.resultados && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Resultados:</Text>
-                    <Text style={styles.detailValue}>{selectedExame.resultados}</Text>
-                  </View>
-                )}
-                {selectedExame.observacoes && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Observações:</Text>
-                    <Text style={styles.detailValue}>{selectedExame.observacoes}</Text>
-                  </View>
-                )}
-                {selectedExame.possui_pdf && (
-                  <>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Arquivo PDF:</Text>
-                      <Text style={styles.detailValue} numberOfLines={2}>
-                        {selectedExame.pdf_nome}
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Tamanho:</Text>
-                      <Text style={styles.detailValue}>{formatarTamanho(selectedExame.pdf_tamanho)}</Text>
-                    </View>
-                  </>
-                )}
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Cadastrado em:</Text>
-                  <Text style={styles.detailValue}>
-                    {new Date(selectedExame.created_at).toLocaleString('pt-BR')}
-                  </Text>
-                </View>
-              </ScrollView>
-            )}
-
-            {selectedExame?.possui_pdf && (
-              <TouchableOpacity 
-                style={styles.modalButton}
-                onPress={() => {
-                  setModalVisible(false);
-                  abrirPDF(selectedExame.pdf_path, selectedExame.pdf_nome);
-                }}
-              >
-                <MaterialCommunityIcons name="file-pdf-box" size={20} color="#FFF" />
-                <Text style={styles.modalButtonText}>Ver PDF</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
-  header: { 
-    backgroundColor: '#8B0000', 
-    padding: 20, 
-    paddingBottom: 15,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
   },
-  headerTitle: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
-  headerSubtitle: { color: '#FFEBEE', fontSize: 14, marginTop: 5 },
-  listContent: { padding: 15 },
-  card: { 
-    backgroundColor: '#FFF', 
-    padding: 15, 
-    borderRadius: 12, 
-    marginBottom: 15, 
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    paddingTop: 60,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#8B0000',
+    marginTop: 8,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 16,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    overflow: 'hidden',
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-  iconContainer: { marginRight: 15, backgroundColor: '#FFEBEE', padding: 10, borderRadius: 50 },
-  infoContainer: { flex: 1 },
-  pacienteNome: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  exameTipo: { fontSize: 15, color: '#8B0000', fontWeight: '600', marginTop: 2 },
-  data: { fontSize: 13, color: '#666', marginTop: 4 },
-  medico: { fontSize: 13, color: '#666', marginTop: 2 },
-  laboratorio: { fontSize: 13, color: '#666', marginTop: 2 },
-  resultadosContainer: { 
-    backgroundColor: '#F5F5F5', 
-    padding: 10, 
-    borderRadius: 8, 
-    marginTop: 5,
-    marginBottom: 10,
-  },
-  resultadosLabel: { fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 3 },
-  resultadosText: { fontSize: 12, color: '#666' },
-  buttonContainer: { flexDirection: 'row', gap: 10, marginTop: 5 },
-  detalhesButton: {
-    flex: 1,
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#E0E0E0',
-    gap: 5,
+    padding: 16,
+    backgroundColor: '#FFF5F5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE0E0',
   },
-  detalhesButtonText: { color: '#555', fontWeight: 'bold', fontSize: 13 },
-  pdfButton: {
-    flex: 1,
+  pacienteInfo: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#2E7D32',
-    gap: 5,
+    flex: 1,
   },
-  pdfButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  pacienteNome: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
   deleteButton: {
+    padding: 8,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '400',
     flex: 1,
+  },
+  resultadosContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    marginBottom: 8,
     padding: 10,
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
-    backgroundColor: '#C62828',
-    gap: 5,
   },
-  deleteButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 10, color: '#666' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 100 },
-  emptyText: { fontSize: 18, color: '#999', marginTop: 20 },
-  emptySubtext: { fontSize: 14, color: '#CCC', marginTop: 5 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#FFF', borderRadius: 20, width: '90%', maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
-  modalBody: { padding: 20 },
-  detailRow: { marginBottom: 15 },
-  detailLabel: { fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 3 },
-  detailValue: { fontSize: 15, color: '#333' },
-  modalButton: {
+  resultadosLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  resultadosText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  observacoesContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#2E7D32',
-    padding: 15,
-    borderRadius: 10,
-    margin: 20,
-    gap: 10,
+    alignItems: 'flex-start',
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
   },
-  modalButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  observacoesLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  observacoesText: {
+    fontSize: 14,
+    color: '#856404',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  pdfBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  pdfText: {
+    fontSize: 12,
+    color: '#D32F2F',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  cardFooter: {
+    padding: 12,
+    backgroundColor: '#FAFAFA',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  dataCriacao: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'right',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
 });
