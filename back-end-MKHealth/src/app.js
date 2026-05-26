@@ -2,13 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const path = require('path');
 const routes = require("./routes/usuarioRoutes");
-const usuarioController = require("./controllers/usuarioController");
+const exameRoutes = require("./routes/exameRoutes"); // Adicionar rotas de exames
+const usuarioController = require("./controllers/UsuarioController");
 
 const app = express();
 
+// Configurar limites maiores para upload de PDF
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' })); // Aumentar limite para PDF
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Log de requisições (para debug)
 app.use((req, res, next) => {
@@ -30,6 +32,7 @@ app.use('/uploads', express.static('uploads'));
 
 // Usar as rotas da API
 app.use("/api/usuarios", routes);
+app.use("/api/exames", exameRoutes); // Adicionar rotas de exames
 
 // Rota de login (mantida para compatibilidade)
 app.post("/logar", usuarioController.logar);
@@ -53,7 +56,15 @@ app.use((req, res) => {
       'POST /api/usuarios/verificar-token',
       'POST /api/usuarios/recuperar-senha',
       'POST /api/usuarios/redefinir-senha',
-      'POST /logar'
+      'POST /logar',
+      'POST /api/exames/',
+      'GET  /api/exames/',
+      'GET  /api/exames/:id',
+      'PUT  /api/exames/:id',
+      'DELETE /api/exames/:id',
+      'GET  /api/exames/stats',
+      'GET  /api/exames/buscar/:nome',
+      'GET  /api/exames/periodo'
     ]
   });
 });

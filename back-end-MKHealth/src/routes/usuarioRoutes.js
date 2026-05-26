@@ -1,6 +1,6 @@
 const express = require('express');
 const routes = express.Router();
-const usuarioController = require('../controllers/usuarioController');
+const usuarioController = require('../controllers/UsuarioController');
 
 // Rotas públicas
 routes.post('/logar', usuarioController.logar);

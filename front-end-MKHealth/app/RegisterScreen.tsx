@@ -12,11 +12,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 
-// URL do seu backend
-const API_URL = 'http://10.16.136.95:3000/api/usuarios';
+// URL do seu backend - ALTERE PARA O IP DO SEU COMPUTADOR
+const API_URL = 'http://192.168.0.13:3000/api/usuarios';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const validateCPF = (cpf: string) => {
+  const validateCPF = (cpf: string): boolean => {
     const cpfClean = cpf.replace(/[^\d]/g, '');
     if (cpfClean.length !== 11) return false;
     
@@ -57,7 +57,7 @@ export default function RegisterScreen() {
     return true;
   };
 
-  const formatCPF = (value: string) => {
+  const formatCPF = (value: string): string => {
     const cpfClean = value.replace(/[^\d]/g, '');
     if (cpfClean.length <= 3) return cpfClean;
     if (cpfClean.length <= 6) return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3)}`;
@@ -65,7 +65,29 @@ export default function RegisterScreen() {
     return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3, 6)}.${cpfClean.slice(6, 9)}-${cpfClean.slice(9, 11)}`;
   };
 
-  const handleRegister = async () => {
+  // Função para testar conexão com o servidor
+  const testServerConnection = async (): Promise<boolean> => {
+    try {
+      console.log('🔍 Testando conexão com o servidor...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      console.log('✅ Servidor respondendo na porta 3000');
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('❌ Servidor não responde:', errorMessage);
+      return false;
+    }
+  };
+
+  const handleRegister = async (): Promise<void> => {
     // Validações
     if (!name.trim()) {
       Alert.alert('Erro', 'Por favor, digite seu nome completo.');
@@ -104,22 +126,39 @@ export default function RegisterScreen() {
     }
 
     setLoading(true);
+    
+    // Testar conexão primeiro
+    const isConnected = await testServerConnection();
+    if (!isConnected) {
+      Alert.alert(
+        'Erro de Conexão',
+        'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando (npm start)\n✓ O IP está correto: ' + API_URL + '\n✓ Celular e computador estão na mesma rede Wi-Fi\n✓ Firewall não está bloqueando a porta 3000'
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       const cpfLimpo = cpf.replace(/[^\d]/g, '');
       
-      console.log('📡 Cadastrando usuário...');
+      console.log('📡 Enviando requisição POST...');
       console.log('📡 URL:', `${API_URL}/`);
       console.log('📡 Dados:', {
         nome_completo: name.trim(),
         email: email.trim(),
         cpf: cpfLimpo,
-        senha: password
+        senha: '***'
       });
+      
+      // Timeout de 15 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
       const response = await fetch(`${API_URL}/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           nome_completo: name.trim(),
@@ -127,29 +166,77 @@ export default function RegisterScreen() {
           cpf: cpfLimpo,
           senha: password
         }),
+        signal: controller.signal
       });
-
-      const data = await response.json();
-      console.log('📡 Resposta:', data);
-
+      
+      clearTimeout(timeoutId);
+      
+      console.log('📡 Status da resposta:', response.status);
+      
+      // Verifica se a resposta tem conteúdo
+      const textResponse = await response.text();
+      console.log('📡 Resposta RAW:', textResponse);
+      
+      if (!textResponse || textResponse.trim() === '') {
+        throw new Error('Servidor retornou resposta vazia.');
+      }
+      
+      // Tenta fazer o parse do JSON
+      let data: any;
+      try {
+        data = JSON.parse(textResponse);
+      } catch (parseError: unknown) {
+        console.error('❌ Erro ao fazer parse do JSON:', parseError);
+        throw new Error('Resposta do servidor inválida.');
+      }
+      
+      // Tratamento de erros baseado no status
+      if (response.status === 400) {
+        Alert.alert('Erro de Validação', data.erro || 'Dados inválidos');
+        return;
+      }
+      
       if (response.status === 409) {
         Alert.alert('Erro', data.erro || 'Email ou CPF já cadastrado');
         return;
       }
-
+      
       if (!response.ok) {
-        throw new Error(data.erro || 'Erro ao cadastrar usuário');
+        throw new Error(data.erro || `Erro ${response.status}: Falha ao cadastrar`);
       }
-
-      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/')
-        }
-      ]);
-    } catch (error: any) {
-      console.error('❌ Erro:', error);
-      Alert.alert('Erro', error.message || 'Erro ao cadastrar');
+      
+      // Sucesso!
+      Alert.alert(
+        'Sucesso!', 
+        data.mensagem || 'Cadastro realizado com sucesso!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/')
+          }
+        ]
+      );
+      
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorName = error instanceof Error ? error.name : '';
+      
+      console.error('❌ Erro detalhado:', error);
+      
+      // Tratamento específico para diferentes erros
+      if (errorName === 'AbortError') {
+        Alert.alert(
+          'Timeout', 
+          'A requisição demorou muito tempo. Verifique sua conexão.'
+        );
+      } else if (errorMessage === 'Network request failed') {
+        Alert.alert(
+          'Erro de Rede',
+          'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando\n✓ O IP está correto: ' + API_URL + '\n✓ O celular está na mesma rede Wi-Fi\n✓ O firewall não está bloqueando a porta 3000'
+        );
+      } else {
+        Alert.alert('Erro', errorMessage || 'Erro ao realizar cadastro.');
+      }
     } finally {
       setLoading(false);
     }
@@ -264,7 +351,10 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#8B0000' },
+  container: {
+    flex: 1,
+    backgroundColor: '#8B0000'
+  },
   backgroundCircle: {
     position: 'absolute',
     top: -100,
@@ -273,44 +363,63 @@ const styles = StyleSheet.create({
     height: 400,
     borderRadius: 200,
     backgroundColor: '#A52A2A',
-    opacity: 0.5,
+    opacity: 0.5
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'flex-start',
     padding: 20,
-    paddingTop: 40,
+    paddingTop: 40
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 10
   },
   logo: {
     width: 120,
     height: 120,
     tintColor: '#FFF',
-    resizeMode: 'contain',
+    resizeMode: 'contain'
   },
   card: {
     backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 5
   },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#333', textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 25 },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 5, marginLeft: 5 },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center'
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 25
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+    marginBottom: 5,
+    marginLeft: 5
+  },
   input: {
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
     padding: 15,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E0E0E0'
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -319,18 +428,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    marginBottom: 20,
+    marginBottom: 20
   },
   passwordInput: {
     flex: 1,
-    padding: 15,
+    padding: 15
   },
   eyeButton: {
-    padding: 15,
+    padding: 15
   },
   eyeIcon: {
     fontSize: 20,
-    color: '#666',
+    color: '#666'
   },
   button: {
     backgroundColor: '#8B0000',
@@ -339,12 +448,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     shadowColor: '#8B0000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
     shadowOpacity: 0.4,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 3
   },
-  buttonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  loginButton: { alignItems: 'center', marginTop: 20 },
-  loginText: { color: '#8B0000', fontSize: 14, fontWeight: 'bold' },
+  buttonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  loginButton: {
+    alignItems: 'center',
+    marginTop: 20
+  },
+  loginText: {
+    color: '#8B0000',
+    fontSize: 14,
+    fontWeight: 'bold'
+  }
 });
