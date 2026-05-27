@@ -1,11 +1,15 @@
 // app/(tabs)/exames.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { useFocusEffect } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -14,7 +18,7 @@ import {
 } from 'react-native';
 
 // URL da API
-const API_URL = 'http://172.17.20.72:3000/api/exames';
+const API_URL = 'http://192.168.0.13:3000/api/exames';
 
 interface Exame {
   id: number;
@@ -36,30 +40,18 @@ interface Exame {
 export default function ExamesScreen() {
   const [listaExames, setListaExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const carregarExames = async () => {
     console.log('🔄 Carregando exames...');
     setLoading(true);
     try {
-      const response = await fetch(API_URL, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('📡 Status:', response.status);
-
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-
+      const response = await fetch(API_URL);
       const data = await response.json();
       console.log(`✅ ${data.length} exames carregados`);
       setListaExames(data);
     } catch (error) {
-      console.error('❌ Erro ao carregar exames:', error);
+      console.error('❌ Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar a lista de exames');
     } finally {
       setLoading(false);
@@ -67,51 +59,199 @@ export default function ExamesScreen() {
   };
 
   const deletarExame = async (id: number) => {
-    try {
-      console.log(`🗑️ Deletando exame ${id}...`);
-      
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao deletar exame');
-      }
-
-      Alert.alert('Sucesso', 'Exame deletado com sucesso!');
-      await carregarExames(); // Recarrega a lista
-    } catch (error) {
-      console.error('❌ Erro ao deletar exame:', error);
-      Alert.alert('Erro', 'Não foi possível deletar o exame');
-    }
-  };
-
-  // Recarregar exames sempre que a tela ganhar foco
-  useFocusEffect(
-    useCallback(() => {
-      carregarExames();
-    }, [])
-  );
-
-  const handleDelete = (id: number, pacienteNome: string) => {
     Alert.alert(
       'Confirmar exclusão',
-      `Deseja realmente excluir o exame de ${pacienteNome}?`,
+      'Deseja realmente excluir este exame?',
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Excluir', 
-          onPress: () => deletarExame(id),
+          onPress: async () => {
+            try {
+              await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+              Alert.alert('Sucesso', 'Exame deletado!');
+              carregarExames();
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível deletar');
+            }
+          },
           style: 'destructive'
         },
       ]
     );
   };
 
-  const formatarData = (dataString: string) => {
-    const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR');
+  // Função para baixar o PDF
+  const baixarPDF = async (exame: Exame): Promise<string | null> => {
+    try {
+      const pdfUrl = `http://192.168.0.13:3000/api/exames/${exame.id}/visualizar`;
+      console.log('📥 Baixando PDF:', pdfUrl);
+      
+      const documentosDir = new Directory(Paths.document);
+      const pdfDir = new Directory(documentosDir, 'pdfs');
+      
+      if (!pdfDir.exists) {
+        pdfDir.create();
+      }
+      
+      const downloadedFile = await File.downloadFileAsync(pdfUrl, pdfDir, {
+        idempotent: true
+      });
+      
+      console.log('✅ PDF salvo em:', downloadedFile.uri);
+      return downloadedFile.uri;
+      
+    } catch (error) {
+      console.error('❌ Erro ao baixar:', error);
+      return null;
+    }
   };
+
+  // Abrir PDF no Android - usando IntentLauncher com URL direta
+  const abrirPDFAndroid = async (fileUri: string, pdfUrl: string) => {
+    try {
+      // Tentar abrir diretamente com a URL do servidor (melhor opção)
+      const serverUrl = pdfUrl;
+      console.log('🌐 Tentando abrir URL do servidor:', serverUrl);
+      
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: serverUrl,
+        type: 'application/pdf',
+      });
+      console.log('✅ PDF aberto via servidor');
+    } catch (error) {
+      console.error('❌ Erro ao abrir via servidor:', error);
+      
+      // Fallback: tentar com o arquivo local via Sharing
+      try {
+        const isSharingAvailable = await Sharing.isAvailableAsync();
+        if (isSharingAvailable) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Abrir PDF com...',
+          });
+        }
+      } catch (shareError) {
+        console.error('❌ Erro no fallback:', shareError);
+        Alert.alert('Erro', 'Não foi possível abrir o PDF');
+      }
+    }
+  };
+
+  // Abrir PDF no iOS
+  const abrirPDFiOS = async (fileUri: string) => {
+    try {
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (isSharingAvailable) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Abrir PDF com...',
+        });
+      } else {
+        Alert.alert('Erro', 'Não foi possível abrir o PDF');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao abrir no iOS:', error);
+      Alert.alert('Erro', 'Não foi possível abrir o PDF');
+    }
+  };
+
+  // Abrir PDF - mostra escolha de aplicativo
+  const abrirPDF = async (exame: Exame) => {
+    if (!exame.possui_pdf || !exame.pdf_path) {
+      Alert.alert('Erro', 'Este exame não possui PDF');
+      return;
+    }
+
+    setDownloadingId(exame.id);
+    
+    try {
+      // Primeiro baixa o PDF
+      const fileUri = await baixarPDF(exame);
+      const pdfUrl = `http://192.168.0.13:3000/api/exames/${exame.id}/visualizar`;
+      
+      if (fileUri) {
+        if (Platform.OS === 'android') {
+          await abrirPDFAndroid(fileUri, pdfUrl);
+        } else {
+          await abrirPDFiOS(fileUri);
+        }
+      } else {
+        Alert.alert('Erro', 'Não foi possível baixar o PDF');
+      }
+    } catch (error) {
+      console.error('❌ Erro:', error);
+      Alert.alert('Erro', 'Não foi possível abrir o PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Apenas baixar o PDF (sem abrir)
+  const baixarApenasPDF = async (exame: Exame) => {
+    if (!exame.possui_pdf || !exame.pdf_path) {
+      Alert.alert('Erro', 'Este exame não possui PDF');
+      return;
+    }
+
+    setDownloadingId(exame.id);
+    
+    try {
+      const fileUri = await baixarPDF(exame);
+      
+      if (fileUri) {
+        Alert.alert(
+          'Download concluído',
+          `PDF salvo com sucesso!`,
+          [
+            { text: 'OK', style: 'cancel' },
+            { 
+              text: 'Abrir', 
+              onPress: async () => {
+                if (Platform.OS === 'android') {
+                  const pdfUrl = `http://192.168.0.13:3000/api/exames/${exame.id}/visualizar`;
+                  await abrirPDFAndroid(fileUri, pdfUrl);
+                } else {
+                  await abrirPDFiOS(fileUri);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Erro', 'Não foi possível baixar o PDF');
+      }
+    } catch (error) {
+      console.error('❌ Erro:', error);
+      Alert.alert('Erro', 'Não foi possível baixar o PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Mostrar menu de opções
+  const mostrarMenuOpcoes = (exame: Exame) => {
+    Alert.alert(
+      'Opções do PDF',
+      exame.pdf_nome || 'Escolha uma opção',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: '📖 Abrir PDF', onPress: () => abrirPDF(exame) },
+        { text: '💾 Baixar PDF', onPress: () => baixarApenasPDF(exame) },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const formatarData = (dataString: string) => {
+    return new Date(dataString).toLocaleDateString('pt-BR');
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarExames();
+    }, [])
+  );
 
   const renderExameCard = ({ item }: { item: Exame }) => (
     <View style={styles.card}>
@@ -120,10 +260,7 @@ export default function ExamesScreen() {
           <MaterialCommunityIcons name="account-circle" size={28} color="#8B0000" />
           <Text style={styles.pacienteNome}>{item.paciente_nome}</Text>
         </View>
-        <TouchableOpacity
-          onPress={() => handleDelete(item.id, item.paciente_nome)}
-          style={styles.deleteButton}
-        >
+        <TouchableOpacity onPress={() => deletarExame(item.id)} style={styles.deleteButton}>
           <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF4444" />
         </TouchableOpacity>
       </View>
@@ -131,7 +268,7 @@ export default function ExamesScreen() {
       <View style={styles.cardContent}>
         <View style={styles.infoRow}>
           <MaterialCommunityIcons name="flask" size={20} color="#666" />
-          <Text style={styles.infoLabel}>Tipo de Exame:</Text>
+          <Text style={styles.infoLabel}>Exame:</Text>
           <Text style={styles.infoValue}>{item.tipo_exame}</Text>
         </View>
 
@@ -155,25 +292,32 @@ export default function ExamesScreen() {
 
         {item.resultados && (
           <View style={styles.resultadosContainer}>
-            <MaterialCommunityIcons name="file-document-outline" size={20} color="#666" />
-            <Text style={styles.resultadosLabel}>Resultados:</Text>
-            <Text style={styles.resultadosText}>{item.resultados}</Text>
+            <Text style={styles.resultadosText}>📋 {item.resultados}</Text>
           </View>
         )}
 
         {item.observacoes && (
           <View style={styles.observacoesContainer}>
-            <MaterialCommunityIcons name="note-text-outline" size={20} color="#666" />
-            <Text style={styles.observacoesLabel}>Observações:</Text>
-            <Text style={styles.observacoesText}>{item.observacoes}</Text>
+            <Text style={styles.observacoesText}>📝 {item.observacoes}</Text>
           </View>
         )}
 
         {item.possui_pdf && (
-          <View style={styles.pdfBadge}>
-            <MaterialCommunityIcons name="file-pdf-box" size={18} color="#FF0000" />
-            <Text style={styles.pdfText}>PDF Anexado</Text>
-          </View>
+          <TouchableOpacity 
+            style={styles.pdfButton}
+            onPress={() => mostrarMenuOpcoes(item)}
+            disabled={downloadingId === item.id}
+          >
+            {downloadingId === item.id ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="file-pdf-box" size={24} color="#FFF" />
+                <Text style={styles.pdfButtonText}>Abrir PDF</Text>
+                <MaterialCommunityIcons name="chevron-down" size={20} color="#FFF" />
+              </>
+            )}
+          </TouchableOpacity>
         )}
       </View>
 
@@ -233,45 +377,22 @@ export default function ExamesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5' },
+  loadingText: { marginTop: 10, fontSize: 16, color: '#666' },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     padding: 20,
     paddingTop: 60,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#8B0000',
-    marginTop: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  listContainer: {
-    padding: 16,
-  },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#8B0000', marginTop: 8 },
+  headerSubtitle: { fontSize: 14, color: '#666', marginTop: 4 },
+  listContainer: { padding: 16 },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     borderRadius: 12,
     marginBottom: 16,
     elevation: 3,
@@ -290,129 +411,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#FFE0E0',
   },
-  pacienteInfo: {
+  pacienteInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  pacienteNome: { fontSize: 18, fontWeight: 'bold', color: '#333', marginLeft: 8, flex: 1 },
+  deleteButton: { padding: 8 },
+  cardContent: { padding: 16 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' },
+  infoLabel: { fontSize: 14, color: '#666', marginRight: 8, fontWeight: '500' },
+  infoValue: { fontSize: 14, color: '#333', flex: 1 },
+  resultadosContainer: { marginTop: 8, marginBottom: 8, padding: 10, backgroundColor: '#F8F9FA', borderRadius: 8 },
+  resultadosText: { fontSize: 14, color: '#333' },
+  observacoesContainer: { marginTop: 8, marginBottom: 8, padding: 10, backgroundColor: '#FFF8E1', borderRadius: 8 },
+  observacoesText: { fontSize: 14, color: '#856404' },
+  pdfButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  pacienteNome: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 8,
-    flex: 1,
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    flexWrap: 'wrap',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '400',
-    flex: 1,
-  },
-  resultadosContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-    marginBottom: 8,
-    padding: 10,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-  },
-  resultadosLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  resultadosText: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  observacoesContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-    marginBottom: 8,
-    padding: 10,
-    backgroundColor: '#FFF8E1',
-    borderRadius: 8,
-  },
-  observacoesLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  observacoesText: {
-    fontSize: 14,
-    color: '#856404',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  pdfBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  pdfText: {
-    fontSize: 12,
-    color: '#D32F2F',
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  cardFooter: {
-    padding: 12,
-    backgroundColor: '#FAFAFA',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  dataCriacao: {
-    fontSize: 11,
-    color: '#999',
-    textAlign: 'right',
-  },
-  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    backgroundColor: '#8B0000',
+    padding: 14,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#999',
-    marginTop: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#CCCCCC',
-    marginTop: 8,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-  },
+  pdfButtonText: { fontSize: 14, fontWeight: 'bold', color: '#FFF' },
+  cardFooter: { padding: 12, backgroundColor: '#FAFAFA', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  dataCriacao: { fontSize: 11, color: '#999', textAlign: 'right' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#999', marginTop: 16 },
+  emptyText: { fontSize: 14, color: '#CCCCCC', marginTop: 8, textAlign: 'center', paddingHorizontal: 40 },
 });

@@ -18,8 +18,8 @@ import {
   View,
 } from 'react-native';
 
-
-const API_URL = 'http://172.17.20.72:3000/api/exames/';  
+// URL do backend - CORRIGIDA para /api/exames
+const API_URL = 'http://192.168.0.13:3000/api/exames';
 
 // Lista de exames comuns
 const commonExams = [
@@ -109,6 +109,10 @@ export default function RegisterExamScreen() {
     return date.toLocaleDateString('pt-BR');
   };
 
+  const formatDateForAPI = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
@@ -134,8 +138,6 @@ export default function RegisterExamScreen() {
         });
         
         Alert.alert('Sucesso', `PDF "${asset.name}" selecionado com sucesso!`);
-      } else {
-        console.log('Usuário cancelou a seleção');
       }
     } catch (err) {
       console.error('Erro ao selecionar PDF:', err);
@@ -147,28 +149,6 @@ export default function RegisterExamScreen() {
   const removePDF = () => {
     setPdfFile(null);
     Alert.alert('Removido', 'PDF removido com sucesso');
-  };
-
-  // Função para testar conexão com o servidor
-  const testServerConnection = async (): Promise<boolean> => {
-    try {
-      console.log('🔍 Testando conexão com o servidor...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch('http://192.168.0.13:3000/health', {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('✅ Servidor respondendo na porta 3000');
-      return true;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error('❌ Servidor não responde:', errorMessage);
-      return false;
-    }
   };
 
   const handleRegisterExam = async () => {
@@ -198,23 +178,14 @@ export default function RegisterExamScreen() {
 
     setLoading(true);
     
-    // Testar conexão primeiro
-    const isConnected = await testServerConnection();
-    if (!isConnected) {
-      Alert.alert(
-        'Erro de Conexão',
-        'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando (npm start)\n✓ O IP está correto: ' + API_URL + '\n✓ Celular e computador estão na mesma rede Wi-Fi\n✓ Firewall não está bloqueando a porta 3000'
-      );
-      setLoading(false);
-      return;
-    }
-
     try {
       // Criar FormData para enviar o arquivo
       const formData = new FormData();
+      
+      // Campos que o backend espera (exatamente como está no controller)
       formData.append('paciente_nome', patientName.trim());
       formData.append('tipo_exame', finalExamType);
-      formData.append('data_exame', examDate.toISOString().split('T')[0]);
+      formData.append('data_exame', formatDateForAPI(examDate));
       formData.append('medico_solicitante', doctorName);
       formData.append('laboratorio', laboratory);
       
@@ -230,7 +201,7 @@ export default function RegisterExamScreen() {
       if (pdfFile) {
         setUploadingPdf(true);
         
-        // Para React Native, precisamos criar um objeto de arquivo no formato esperado
+        // Criar objeto de arquivo para o FormData no React Native
         const fileToUpload = {
           uri: pdfFile.uri,
           type: pdfFile.mimeType,
@@ -238,19 +209,17 @@ export default function RegisterExamScreen() {
         } as any;
         
         formData.append('pdf', fileToUpload);
-        console.log('📎 PDF adicionado ao FormData:', pdfFile.name);
+        console.log('📎 PDF adicionado:', pdfFile.name);
       }
       
-      console.log('📡 Enviando requisição POST com FormData...');
-      console.log('📡 URL:', API_URL);
+      console.log('📡 Enviando para:', API_URL);
       console.log('📡 Dados:', {
         paciente_nome: patientName.trim(),
         tipo_exame: finalExamType,
-        data_exame: examDate.toISOString().split('T')[0],
+        data_exame: formatDateForAPI(examDate),
         medico_solicitante: doctorName,
         laboratorio: laboratory,
-        possui_pdf: !!pdfFile,
-        pdf_nome: pdfFile?.name
+        possui_pdf: !!pdfFile
       });
       
       const controller = new AbortController();
@@ -260,7 +229,6 @@ export default function RegisterExamScreen() {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
-          // Não definir Content-Type aqui - o fetch vai definir automaticamente com o boundary correto
         },
         body: formData,
         signal: controller.signal
@@ -268,78 +236,60 @@ export default function RegisterExamScreen() {
       
       clearTimeout(timeoutId);
       
-      console.log('📡 Status da resposta:', response.status);
+      console.log('📡 Status:', response.status);
       
-      const textResponse = await response.text();
-      console.log('📡 Resposta RAW:', textResponse);
-      
-      if (!textResponse || textResponse.trim() === '') {
-        throw new Error('Servidor retornou resposta vazia.');
-      }
-      
+      // Tentar parsear a resposta
       let data;
+      const responseText = await response.text();
+      console.log('📡 Resposta:', responseText);
+      
       try {
-        data = JSON.parse(textResponse);
-      } catch (parseError) {
-        console.error('❌ Erro ao fazer parse do JSON:', parseError);
-        throw new Error('Resposta do servidor inválida.');
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Erro ao parsear JSON:', e);
+        throw new Error('Resposta inválida do servidor');
       }
       
-      if (response.status === 400) {
-        Alert.alert('Erro de Validação', data.erro || 'Dados inválidos');
-        return;
-      }
-      
-      if (response.status === 409) {
-        Alert.alert('Erro', data.erro || 'Exame já cadastrado');
-        return;
-      }
-      
-      if (!response.ok) {
-        throw new Error(data.erro || `Erro ${response.status}: Falha ao cadastrar exame`);
-      }
-      
-      Alert.alert(
-        'Sucesso!', 
-        pdfFile ? 'Exame cadastrado com PDF anexado com sucesso!' : 'Exame cadastrado com sucesso!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setPatientName('');
-              setExamType('');
-              setCustomExam('');
-              setShowCustomExam(false);
-              setExamDate(new Date());
-              setDoctorName('');
-              setLaboratory('');
-              setResults('');
-              setObservations('');
-              setPdfFile(null);
-              router.push('/exames');
+      if (response.status === 201 || response.status === 200) {
+        Alert.alert(
+          'Sucesso!', 
+          data.mensagem || (pdfFile ? 'Exame cadastrado com PDF!' : 'Exame cadastrado com sucesso!'),
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Limpar formulário
+                setPatientName('');
+                setExamType('');
+                setCustomExam('');
+                setShowCustomExam(false);
+                setExamDate(new Date());
+                setDoctorName('');
+                setLaboratory('');
+                setResults('');
+                setObservations('');
+                setPdfFile(null);
+                router.push('/exames');
+              }
             }
-          }
-        ]
-      );
-      
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      const errorName = error instanceof Error ? error.name : '';
-      
-      console.error('❌ Erro detalhado:', error);
-      
-      if (errorName === 'AbortError') {
-        Alert.alert(
-          'Timeout', 
-          'A requisição demorou muito tempo. Verifique sua conexão.'
-        );
-      } else if (errorMessage === 'Network request failed') {
-        Alert.alert(
-          'Erro de Rede',
-          'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando\n✓ O IP está correto: ' + API_URL + '\n✓ O celular está na mesma rede Wi-Fi\n✓ O firewall não está bloqueando a porta 3000'
+          ]
         );
       } else {
-        Alert.alert('Erro', errorMessage || 'Erro ao cadastrar exame.');
+        Alert.alert('Erro', data.erro || 'Erro ao cadastrar exame');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erro:', error);
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Timeout', 'A requisição demorou muito tempo. Verifique sua conexão.');
+      } else if (error.message === 'Network request failed') {
+        Alert.alert(
+          'Erro de Rede',
+          `Não foi possível conectar ao servidor em:\n${API_URL}\n\nVerifique:\n• O backend está rodando\n• O IP está correto\n• Celular e computador estão na mesma rede Wi-Fi\n• Firewall não está bloqueando a porta 3000`
+        );
+      } else {
+        Alert.alert('Erro', error.message || 'Erro ao cadastrar exame');
       }
     } finally {
       setLoading(false);
@@ -479,7 +429,6 @@ export default function RegisterExamScreen() {
             textAlignVertical="top"
           />
 
-          {/* Campo para anexar PDF */}
           <Text style={styles.label}>Anexar PDF do Exame</Text>
           {!pdfFile ? (
             <TouchableOpacity style={styles.attachButton} onPress={selectPDF}>
