@@ -14,9 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
+import IP from '../service/api';
 // URL do seu backend - ALTERE PARA O IP DO SEU COMPUTADOR
-const API_URL = 'http://192.168.0.13:3000/api/usuarios';
+const API_URL = `http://${IP}/api/usuarios`;
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);

@@ -3,7 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useExames } from './_context/ExamesContext';
+import { useExames } from '../service/ExamesContext';
 
 export default function AdminScreen() {
   const [cpf, setCpf] = useState('');

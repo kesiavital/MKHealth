@@ -1,14 +1,17 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,11 +20,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import IP from '../../service/api';
 
-// URL do backend - CORRIGIDA para /api/exames
-const API_URL = 'http://192.168.0.13:3000/api/exames';
+const API_URL = `http://${IP}/api/exames`;
 
-// Lista de exames comuns
+// Lista de exames comuns (mantenha igual)
 const commonExams = [
   { id: 1, name: 'Hemograma Completo', category: 'Sangue' },
   { id: 2, name: 'Glicemia em Jejum', category: 'Sangue' },
@@ -53,7 +56,6 @@ const commonExams = [
   { id: 28, name: 'Papanicolau', category: 'Ginecologia' },
 ];
 
-// Lista de clínicas/laboratórios
 const clinics = [
   { id: 1, name: 'Laboratório Exame Plus', address: 'Av. Paulista, 1000', rating: 4.8 },
   { id: 2, name: 'Clínica Diagnóstico Avançado', address: 'Rua Augusta, 500', rating: 4.6 },
@@ -67,7 +69,6 @@ const clinics = [
   { id: 10, name: 'Clínica Preventiva', address: 'Rua Maria Paula, 100', rating: 4.5 },
 ];
 
-// Lista de médicos
 const doctors = [
   { id: 1, name: 'Dra. Ana Silva', specialty: 'Clínico Geral' },
   { id: 2, name: 'Dr. Carlos Santos', specialty: 'Cardiologista' },
@@ -79,7 +80,7 @@ const doctors = [
   { id: 8, name: 'Dr. Ricardo Pereira', specialty: 'Neurologista' },
 ];
 
-interface PDFFile {
+interface AttachmentFile {
   uri: string;
   name: string;
   size: number;
@@ -88,8 +89,7 @@ interface PDFFile {
 
 export default function RegisterExamScreen() {
   const [loading, setLoading] = useState(false);
-  
-  // Campos do formulário
+
   const [patientName, setPatientName] = useState('');
   const [examType, setExamType] = useState('');
   const [customExam, setCustomExam] = useState('');
@@ -100,10 +100,15 @@ export default function RegisterExamScreen() {
   const [laboratory, setLaboratory] = useState('');
   const [results, setResults] = useState('');
   const [observations, setObservations] = useState('');
+
+  const [attachment, setAttachment] = useState<AttachmentFile | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   
-  // Campos para anexo
-  const [pdfFile, setPdfFile] = useState<PDFFile | null>(null);
-  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+  const [attachmentMethod, setAttachmentMethod] = useState<'file' | 'scan' | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const formatDate = (date: Date): string => {
     return date.toLocaleDateString('pt-BR');
@@ -120,23 +125,22 @@ export default function RegisterExamScreen() {
     }
   };
 
-  // Função para selecionar PDF no Expo
   const selectPDF = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
       });
-      
+
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        setPdfFile({
+        setAttachment({
           uri: asset.uri,
           name: asset.name,
           size: asset.size || 0,
-          mimeType: asset.mimeType || 'application/pdf',
+          mimeType: 'application/pdf',
         });
-        
+        setAttachmentMethod('file');
         Alert.alert('Sucesso', `PDF "${asset.name}" selecionado com sucesso!`);
       }
     } catch (err) {
@@ -145,14 +149,74 @@ export default function RegisterExamScreen() {
     }
   };
 
-  // Função para remover PDF
-  const removePDF = () => {
-    setPdfFile(null);
-    Alert.alert('Removido', 'PDF removido com sucesso');
+  const scanDocument = async () => {
+    const hasPermission = await requestPermission();
+    
+    if (hasPermission.granted) {
+      setShowScanner(true);
+    } else {
+      Alert.alert('Erro', 'É necessário permitir o acesso à câmera para escanear documentos');
+    }
+  };
+
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      setProcessingImage(true);
+      
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+        });
+
+        if (photo) {
+          // Processar imagem para melhor qualidade
+          const processedImage = await ImageManipulator.manipulateAsync(
+            photo.uri,
+            [
+              { resize: { width: 1024 } },
+            ],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+          );
+
+          const imageName = `scan_${Date.now()}.jpg`;
+          
+          // Obter o tamanho do arquivo
+          let fileSize = 0;
+          try {
+            const response = await fetch(processedImage.uri);
+            const blob = await response.blob();
+            fileSize = blob.size;
+          } catch (error) {
+            console.log('Erro ao obter tamanho:', error);
+          }
+          
+          setAttachment({
+            uri: processedImage.uri,
+            name: imageName,
+            size: fileSize,
+            mimeType: 'image/jpeg',
+          });
+          setAttachmentMethod('scan');
+          setShowScanner(false);
+          
+          Alert.alert('Sucesso', 'Documento escaneado com sucesso!');
+        }
+      } catch (error) {
+        console.error('Erro ao escanear:', error);
+        Alert.alert('Erro', 'Não foi possível escanear o documento. Tente novamente.');
+      } finally {
+        setProcessingImage(false);
+      }
+    }
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    setAttachmentMethod(null);
+    Alert.alert('Removido', 'Anexo removido com sucesso');
   };
 
   const handleRegisterExam = async () => {
-    // Validações
     if (!patientName.trim()) {
       Alert.alert('Erro', 'Por favor, digite o nome do paciente.');
       return;
@@ -177,54 +241,42 @@ export default function RegisterExamScreen() {
     }
 
     setLoading(true);
-    
+
     try {
-      // Criar FormData para enviar o arquivo
       const formData = new FormData();
-      
-      // Campos que o backend espera (exatamente como está no controller)
+
       formData.append('paciente_nome', patientName.trim());
       formData.append('tipo_exame', finalExamType);
       formData.append('data_exame', formatDateForAPI(examDate));
       formData.append('medico_solicitante', doctorName);
       formData.append('laboratorio', laboratory);
-      
+
       if (results.trim()) {
         formData.append('resultados', results.trim());
       }
-      
+
       if (observations.trim()) {
         formData.append('observacoes', observations.trim());
       }
-      
-      // Adicionar PDF se existir
-      if (pdfFile) {
-        setUploadingPdf(true);
-        
-        // Criar objeto de arquivo para o FormData no React Native
+
+      if (attachment) {
+        setUploadingFile(true);
+
         const fileToUpload = {
-          uri: pdfFile.uri,
-          type: pdfFile.mimeType,
-          name: pdfFile.name,
+          uri: attachment.uri,
+          type: attachment.mimeType,
+          name: attachment.name,
         } as any;
-        
+
         formData.append('pdf', fileToUpload);
-        console.log('📎 PDF adicionado:', pdfFile.name);
+        console.log(`📎 Enviando ${attachmentMethod === 'scan' ? 'imagem escaneada' : 'PDF'}:`, attachment.name);
       }
-      
+
       console.log('📡 Enviando para:', API_URL);
-      console.log('📡 Dados:', {
-        paciente_nome: patientName.trim(),
-        tipo_exame: finalExamType,
-        data_exame: formatDateForAPI(examDate),
-        medico_solicitante: doctorName,
-        laboratorio: laboratory,
-        possui_pdf: !!pdfFile
-      });
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -233,32 +285,27 @@ export default function RegisterExamScreen() {
         body: formData,
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
-      console.log('📡 Status:', response.status);
-      
-      // Tentar parsear a resposta
+
       let data;
       const responseText = await response.text();
-      console.log('📡 Resposta:', responseText);
-      
+
       try {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('Erro ao parsear JSON:', e);
         throw new Error('Resposta inválida do servidor');
       }
-      
+
       if (response.status === 201 || response.status === 200) {
         Alert.alert(
-          'Sucesso!', 
-          data.mensagem || (pdfFile ? 'Exame cadastrado com PDF!' : 'Exame cadastrado com sucesso!'),
+          'Sucesso!',
+          data.mensagem || 'Exame cadastrado com sucesso!',
           [
             {
               text: 'OK',
               onPress: () => {
-                // Limpar formulário
                 setPatientName('');
                 setExamType('');
                 setCustomExam('');
@@ -268,7 +315,8 @@ export default function RegisterExamScreen() {
                 setLaboratory('');
                 setResults('');
                 setObservations('');
-                setPdfFile(null);
+                setAttachment(null);
+                setAttachmentMethod(null);
                 router.push('/exames');
               }
             }
@@ -277,23 +325,23 @@ export default function RegisterExamScreen() {
       } else {
         Alert.alert('Erro', data.erro || 'Erro ao cadastrar exame');
       }
-      
+
     } catch (error: any) {
       console.error('❌ Erro:', error);
-      
+
       if (error.name === 'AbortError') {
         Alert.alert('Timeout', 'A requisição demorou muito tempo. Verifique sua conexão.');
       } else if (error.message === 'Network request failed') {
         Alert.alert(
           'Erro de Rede',
-          `Não foi possível conectar ao servidor em:\n${API_URL}\n\nVerifique:\n• O backend está rodando\n• O IP está correto\n• Celular e computador estão na mesma rede Wi-Fi\n• Firewall não está bloqueando a porta 3000`
+          `Não foi possível conectar ao servidor em:\n${API_URL}\n\nVerifique:\n• O backend está rodando\n• O IP está correto\n• Celular e computador estão na mesma rede Wi-Fi`
         );
       } else {
         Alert.alert('Erro', error.message || 'Erro ao cadastrar exame');
       }
     } finally {
       setLoading(false);
-      setUploadingPdf(false);
+      setUploadingFile(false);
     }
   };
 
@@ -360,7 +408,7 @@ export default function RegisterExamScreen() {
           )}
 
           <Text style={styles.label}>Data do Exame *</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker(true)}
           >
@@ -368,7 +416,7 @@ export default function RegisterExamScreen() {
               {formatDate(examDate)}
             </Text>
           </TouchableOpacity>
-          
+
           {showDatePicker && (
             <DateTimePicker
               value={examDate}
@@ -429,62 +477,125 @@ export default function RegisterExamScreen() {
             textAlignVertical="top"
           />
 
-          <Text style={styles.label}>Anexar PDF do Exame</Text>
-          {!pdfFile ? (
-            <TouchableOpacity style={styles.attachButton} onPress={selectPDF}>
-              <Text style={styles.attachButtonText}>📎 Selecionar arquivo PDF</Text>
-            </TouchableOpacity>
+          <Text style={styles.label}>Anexar Documento</Text>
+          
+          {!attachment ? (
+            <View style={styles.attachmentOptions}>
+              <TouchableOpacity style={styles.attachButton} onPress={selectPDF}>
+                <Text style={styles.attachButtonText}>📁 Selecionar PDF</Text>
+                <Text style={styles.attachSubtext}>do dispositivo</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.scanButton} onPress={scanDocument}>
+                <Text style={styles.scanButtonText}>📷 Escanear Documento</Text>
+                <Text style={styles.scanSubtext}>físico com a câmera</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <View style={styles.pdfInfoContainer}>
-              <View style={styles.pdfInfo}>
-                <Text style={styles.pdfIcon}>📄</Text>
-                <View style={styles.pdfDetails}>
-                  <Text style={styles.pdfName} numberOfLines={1}>
-                    {pdfFile.name}
+            <View style={styles.attachmentInfoContainer}>
+              <View style={styles.attachmentInfo}>
+                <Text style={styles.attachmentIcon}>
+                  {attachmentMethod === 'scan' ? '📷' : '📄'}
+                </Text>
+                <View style={styles.attachmentDetails}>
+                  <Text style={styles.attachmentName} numberOfLines={1}>
+                    {attachment.name}
                   </Text>
-                  <Text style={styles.pdfSize}>
-                    {(pdfFile.size / 1024).toFixed(2)} KB
+                  <Text style={styles.attachmentType}>
+                    {attachmentMethod === 'scan' ? 'Documento escaneado' : 'PDF do dispositivo'} • 
+                    {(attachment.size / 1024).toFixed(2)} KB
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.removePdfButton} onPress={removePDF}>
-                <Text style={styles.removePdfText}>❌ Remover</Text>
+              <TouchableOpacity style={styles.removeButton} onPress={removeAttachment}>
+                <Text style={styles.removeText}>❌ Remover</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {uploadingPdf && (
+          {uploadingFile && (
             <View style={styles.uploadingContainer}>
               <ActivityIndicator size="small" color="#8B0000" />
-              <Text style={styles.uploadingText}>Enviando PDF...</Text>
+              <Text style={styles.uploadingText}>Enviando documento...</Text>
             </View>
           )}
 
           <TouchableOpacity
             style={styles.button}
             onPress={handleRegisterExam}
-            disabled={loading || uploadingPdf}
+            disabled={loading || uploadingFile}
           >
-            {(loading || uploadingPdf) ? (
+            {(loading || uploadingFile) ? (
               <ActivityIndicator color="#FFF" />
             ) : (
               <Text style={styles.buttonText}>CADASTRAR EXAME</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.listButton} 
+          <TouchableOpacity
+            style={styles.listButton}
             onPress={() => router.push('/exames')}
           >
             <Text style={styles.listText}>Ver Lista de Exames</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={showScanner}
+        onRequestClose={() => setShowScanner(false)}
+      >
+        <View style={styles.cameraContainer}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.cameraFull}
+            facing="back"
+          >
+            <View style={styles.cameraOverlay}>
+              <View style={styles.scanFrameContainer}>
+                <View style={styles.scanFrame}>
+                  <View style={styles.scanCornerTL} />
+                  <View style={styles.scanCornerTR} />
+                  <View style={styles.scanCornerBL} />
+                  <View style={styles.scanCornerBR} />
+                </View>
+                <Text style={styles.scanInstruction}>
+                  Posicione o documento dentro da moldura
+                </Text>
+              </View>
+              
+              <View style={styles.cameraControls}>
+                <TouchableOpacity 
+                  style={styles.cancelScanButton}
+                  onPress={() => setShowScanner(false)}
+                >
+                  <Text style={styles.cancelScanText}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.captureScanButton}
+                  onPress={takePicture}
+                  disabled={processingImage}
+                >
+                  {processingImage ? (
+                    <ActivityIndicator size="large" color="#FFF" />
+                  ) : (
+                    <View style={styles.captureButtonInner} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </CameraView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  // ... (mantenha os mesmos styles do código anterior)
   container: {
     flex: 1,
     backgroundColor: '#8B0000'
@@ -588,22 +699,51 @@ const styles = StyleSheet.create({
     height: 50,
     width: '100%'
   },
+  attachmentOptions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
   attachButton: {
+    flex: 1,
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
     alignItems: 'center'
   },
   attachButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#8B0000',
     fontWeight: 'bold'
   },
-  pdfInfoContainer: {
+  attachSubtext: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2
+  },
+  scanButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: '#8B0000',
+    alignItems: 'center'
+  },
+  scanButtonText: {
+    fontSize: 14,
+    color: '#8B0000',
+    fontWeight: 'bold'
+  },
+  scanSubtext: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2
+  },
+  attachmentInfoContainer: {
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
     padding: 15,
@@ -614,32 +754,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  pdfInfo: {
+  attachmentInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1
   },
-  pdfIcon: {
+  attachmentIcon: {
     fontSize: 30,
     marginRight: 10
   },
-  pdfDetails: {
+  attachmentDetails: {
     flex: 1
   },
-  pdfName: {
+  attachmentName: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#333'
   },
-  pdfSize: {
-    fontSize: 12,
+  attachmentType: {
+    fontSize: 11,
     color: '#666',
     marginTop: 2
   },
-  removePdfButton: {
+  removeButton: {
     padding: 8
   },
-  removePdfText: {
+  removeText: {
     fontSize: 14,
     color: '#FF0000'
   },
@@ -685,5 +825,108 @@ const styles = StyleSheet.create({
     color: '#8B0000',
     fontSize: 14,
     fontWeight: 'bold'
-  }
+  },
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  cameraFull: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'space-between',
+  },
+  scanFrameContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: '85%',
+    height: '45%',
+    position: 'relative',
+  },
+  scanCornerTL: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 40,
+    height: 40,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: '#8B0000',
+  },
+  scanCornerTR: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderColor: '#8B0000',
+  },
+  scanCornerBL: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 40,
+    height: 40,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: '#8B0000',
+  },
+  scanCornerBR: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderColor: '#8B0000',
+  },
+  scanInstruction: {
+    color: '#FFF',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 8,
+    borderRadius: 8,
+  },
+  cameraControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 30,
+    marginBottom: 30,
+  },
+  cancelScanButton: {
+    padding: 15,
+    backgroundColor: '#FF0000',
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  cancelScanText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  captureScanButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFF',
+  },
 });

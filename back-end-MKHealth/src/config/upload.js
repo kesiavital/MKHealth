@@ -23,12 +23,22 @@ const storage = multer.diskStorage({
   }
 });
 
-// Filtrar apenas PDFs
+// Filtrar PDFs e imagens (MODIFICADO)
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
+  // Aceitar PDF e imagens comuns
+  const allowedTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/heic',
+    'image/heif'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Apenas arquivos PDF são permitidos'), false);
+    cb(new Error('Apenas arquivos PDF e imagens (JPEG, PNG) são permitidos'), false);
   }
 };
 
