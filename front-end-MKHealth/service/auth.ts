@@ -1,6 +1,5 @@
 // service/auth.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
 
 export const logout = async () => {
   try {
@@ -24,15 +23,11 @@ export const logout = async () => {
     console.log('📦 Depois do logout - Usuário:', usuarioAfter ? '⚠️ Ainda presente' : '✅ Limpo');
     
     console.log('✅ Usuário deslogado com sucesso');
-    
-    // Forçar navegação para login e impedir volta
-    console.log('🚀 Redirecionando para tela de login...');
-    
-    // Usar replace para não permitir voltar
-    router.replace('/login');
+    return true;
     
   } catch (error) {
     console.error('❌ Erro ao fazer logout:', error);
+    return false;
   }
 };
 
@@ -65,6 +60,29 @@ export const isAuthenticated = async (): Promise<boolean> => {
     return isAuth;
   } catch (error) {
     console.error('Erro ao verificar autenticação:', error);
+    return false;
+  }
+};
+
+// Função para salvar dados do usuário após login
+export const saveUserData = async (token: string, userData: any) => {
+  try {
+    console.log('💾 Salvando dados do usuário no auth...');
+    await AsyncStorage.setItem('token', token);
+    await AsyncStorage.setItem('usuario', JSON.stringify(userData));
+    console.log('✅ Dados salvos com sucesso no auth');
+    
+    // Verificar se salvou
+    const savedToken = await AsyncStorage.getItem('token');
+    const savedUser = await AsyncStorage.getItem('usuario');
+    
+    if (savedToken && savedUser) {
+      console.log('✅ Verificação: Dados confirmados');
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('❌ Erro ao salvar dados:', error);
     return false;
   }
 };
