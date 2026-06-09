@@ -19,7 +19,7 @@ import {
 import IP from '../../service/api';
 
 // URL da API
-const API_URL = `http://${IP}/api/exames`;
+const API_URL = `http://${IP}:3000/api/exames`;
 
 interface Exame {
   id: number;

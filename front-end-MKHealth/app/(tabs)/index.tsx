@@ -20,8 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
 const { width: screenWidth } = Dimensions.get('window');
 
-// URL da API
-const API_URL = `http://${IP}/api/exames`;
+// ✅ CORRIGIDO: Adicionei a porta :3000
+const API_URL = `http://${IP}:3000/api/exames`;
+
 
 interface Exame {
   id: number;
