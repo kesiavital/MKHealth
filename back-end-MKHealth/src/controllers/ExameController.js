@@ -23,9 +23,20 @@ function deletarArquivoPdf(filename) {
   
   const filePath = path.join(uploadDir, filename);
   if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-    console.log(`📄 Arquivo deletado: ${filename}`);
+    try {
+      fs.unlinkSync(filePath);
+      console.log(`📄 Arquivo deletado: ${filename}`);
+    } catch (error) {
+      console.error(`❌ Erro ao deletar arquivo ${filename}:`, error);
+    }
   }
+}
+
+// Função para verificar se o PDF existe
+function verificarPdfExiste(filename) {
+  if (!filename) return false;
+  const filePath = path.join(uploadDir, filename);
+  return fs.existsSync(filePath);
 }
 
 module.exports = {
@@ -34,7 +45,7 @@ module.exports = {
     try {
       console.log('📝 Iniciando cadastro de exame...');
       console.log('📝 Body recebido:', req.body);
-      console.log('📎 Arquivo recebido:', req.file);
+      console.log('📎 Arquivo recebido:', req.file ? req.file.originalname : 'Nenhum');
       
       const { 
         paciente_nome, 
@@ -48,7 +59,6 @@ module.exports = {
 
       // Validação de campos obrigatórios
       if (!paciente_nome || !tipo_exame || !data_exame || !medico_solicitante || !laboratorio) {
-        // Se tiver arquivo enviado, deletar
         if (req.file) {
           deletarArquivoPdf(req.file.filename);
         }
@@ -96,7 +106,6 @@ module.exports = {
 
       console.log('✅ Exame criado com ID:', exame.id);
 
-      // Resposta de sucesso
       return res.status(201).json({
         sucesso: true,
         mensagem: "Exame cadastrado com sucesso",
@@ -121,18 +130,15 @@ module.exports = {
     } catch (error) {
       console.error('❌ Erro detalhado no cadastro do exame:', error);
       
-      // Se tiver arquivo enviado, deletar
       if (req.file) {
         deletarArquivoPdf(req.file.filename);
       }
       
-      // Tratamento para erro de validação
       if (error.name === 'SequelizeValidationError') {
         const mensagens = error.errors.map(err => err.message).join(', ');
         return res.status(400).json({ erro: mensagens });
       }
       
-      // Outros erros
       return res.status(500).json({ 
         erro: "Erro interno do servidor",
         detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -158,7 +164,7 @@ module.exports = {
         laboratorio: e.laboratorio,
         resultados: e.resultados,
         observacoes: e.observacoes,
-        possui_pdf: !!e.pdf_filename,
+        possui_pdf: !!e.pdf_filename && verificarPdfExiste(e.pdf_filename),
         pdf_nome: e.pdf_originalname,
         pdf_tamanho: e.pdf_size,
         pdf_path: e.pdf_path,
@@ -199,7 +205,7 @@ module.exports = {
         laboratorio: exame.laboratorio,
         resultados: exame.resultados,
         observacoes: exame.observacoes,
-        possui_pdf: !!exame.pdf_filename,
+        possui_pdf: !!exame.pdf_filename && verificarPdfExiste(exame.pdf_filename),
         pdf_nome: exame.pdf_originalname,
         pdf_tamanho: exame.pdf_size,
         pdf_path: exame.pdf_path,
@@ -235,14 +241,18 @@ module.exports = {
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ 
-          erro: "Arquivo PDF não encontrado no servidor" 
+          erro: "Arquivo PDF não encontrado no servidor",
+          filename: exame.pdf_filename,
+          procurado_em: filePath
         });
       }
       
       res.download(filePath, exame.pdf_originalname, (err) => {
         if (err) {
           console.error('❌ Erro no download:', err);
-          res.status(500).json({ erro: "Erro ao fazer download do PDF" });
+          if (!res.headersSent) {
+            res.status(500).json({ erro: "Erro ao fazer download do PDF" });
+          }
         }
       });
     } catch (error) {
@@ -253,7 +263,7 @@ module.exports = {
     }
   },
 
-  // VISUALIZAR PDF (abrir no navegador)
+  // VISUALIZAR PDF (abrir no navegador) - VERSÃO SIMPLIFICADA E CORRIGIDA
   async visualizarPdf(req, res) {
     try {
       const exame = await Exame.findByPk(req.params.id);
@@ -270,21 +280,49 @@ module.exports = {
         });
       }
       
+      // Construir o caminho do arquivo
       const filePath = path.join(uploadDir, exame.pdf_filename);
       
+      console.log('=== VISUALIZAR PDF ===');
+      console.log('ID:', req.params.id);
+      console.log('Filename:', exame.pdf_filename);
+      console.log('Upload dir:', uploadDir);
+      console.log('Caminho completo:', filePath);
+      console.log('Arquivo existe?', fs.existsSync(filePath));
+      
+      // Verificar se o arquivo existe
       if (!fs.existsSync(filePath)) {
+        // Se não existir, tentar encontrar em outras possíveis localizações
+        const alternativePath = path.join(process.cwd(), 'uploads', 'exams', exame.pdf_filename);
+        console.log('Tentando caminho alternativo:', alternativePath);
+        
+        if (fs.existsSync(alternativePath)) {
+          console.log('✅ Encontrado no caminho alternativo!');
+          // Redirecionar para o caminho estático
+          return res.redirect(`/uploads/exams/${exame.pdf_filename}`);
+        }
+        
         return res.status(404).json({ 
-          erro: "Arquivo PDF não encontrado no servidor" 
+          erro: "Arquivo PDF não encontrado no servidor",
+          filename: exame.pdf_filename,
+          caminho_procurado: filePath,
+          dica: "Verifique se o arquivo está na pasta: uploads/exams/"
         });
       }
       
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline');
-      fs.createReadStream(filePath).pipe(res);
+      // REDIRECIONAR PARA O ARQUIVO ESTÁTICO (solução mais simples)
+      // Isso permite que o navegador gerencie o PDF diretamente
+      const pdfUrl = `/uploads/exams/${exame.pdf_filename}`;
+      console.log('📎 Redirecionando para:', pdfUrl);
+      
+      // Redirecionar para o arquivo estático
+      return res.redirect(pdfUrl);
+      
     } catch (error) {
       console.error('❌ Erro ao visualizar PDF:', error);
       return res.status(500).json({ 
-        erro: error.message 
+        erro: "Erro interno ao processar o PDF",
+        detalhe: error.message 
       });
     }
   },
@@ -319,7 +357,7 @@ module.exports = {
         laboratorio: e.laboratorio,
         resultados: e.resultados,
         observacoes: e.observacoes,
-        possui_pdf: !!e.pdf_filename,
+        possui_pdf: !!e.pdf_filename && verificarPdfExiste(e.pdf_filename),
         pdf_nome: e.pdf_originalname,
         pdf_path: e.pdf_path,
         created_at: e.createdAt,
@@ -407,7 +445,7 @@ module.exports = {
     try {
       console.log(`✏️ Atualizando exame ID: ${req.params.id}`);
       console.log('📝 Body:', req.body);
-      console.log('📎 Novo arquivo:', req.file);
+      console.log('📎 Novo arquivo:', req.file ? req.file.originalname : 'Nenhum');
       
       const exame = await Exame.findByPk(req.params.id);
       

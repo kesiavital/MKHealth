@@ -3,11 +3,16 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
+// CORRIGIDO: Caminho absoluto para a pasta uploads/exams
+const uploadDir = path.join(__dirname, '../uploads/exams');
+
 // Garantir que a pasta de uploads existe
-const uploadDir = path.join(__dirname, '../../uploads/exams');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('📁 Pasta de uploads criada:', uploadDir);
 }
+
+console.log('📁 Upload configurado para:', uploadDir);
 
 // Configuração do storage
 const storage = multer.diskStorage({
@@ -19,11 +24,12 @@ const storage = multer.diskStorage({
     const uniqueId = uuidv4();
     const extension = path.extname(file.originalname);
     const fileName = `${uniqueId}${extension}`;
+    console.log('📎 Salvando arquivo como:', fileName);
     cb(null, fileName);
   }
 });
 
-// Filtrar PDFs e imagens (MODIFICADO)
+// Filtrar PDFs e imagens
 const fileFilter = (req, file, cb) => {
   // Aceitar PDF e imagens comuns
   const allowedTypes = [

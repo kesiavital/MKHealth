@@ -1,15 +1,10 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,62 +17,55 @@ import {
 } from 'react-native';
 import IP from '../../service/api';
 
-const API_URL = `http://${IP}/api/exames`;
+const API_URL = `http://${IP}:3000/api/exames`;
 
-// Lista de exames comuns (mantenha igual)
-const commonExams = [
-  { id: 1, name: 'Hemograma Completo', category: 'Sangue' },
-  { id: 2, name: 'Glicemia em Jejum', category: 'Sangue' },
-  { id: 3, name: 'Colesterol Total e Frações', category: 'Sangue' },
-  { id: 4, name: 'Triglicerídeos', category: 'Sangue' },
-  { id: 5, name: 'TGO/AST', category: 'Sangue' },
-  { id: 6, name: 'TGP/ALT', category: 'Sangue' },
-  { id: 7, name: 'Creatinina', category: 'Sangue' },
-  { id: 8, name: 'Uréia', category: 'Sangue' },
-  { id: 9, name: 'Ácido Úrico', category: 'Sangue' },
-  { id: 10, name: 'Vitamina D', category: 'Sangue' },
-  { id: 11, name: 'Ferritina', category: 'Sangue' },
-  { id: 12, name: 'PSA Total', category: 'Sangue' },
-  { id: 13, name: 'TSH', category: 'Hormônios' },
-  { id: 14, name: 'T4 Livre', category: 'Hormônios' },
-  { id: 15, name: 'Testosterona', category: 'Hormônios' },
-  { id: 16, name: 'Raio-X de Tórax', category: 'Imagem' },
-  { id: 17, name: 'Ultrassonografia Abdômen Total', category: 'Imagem' },
-  { id: 18, name: 'Mamografia', category: 'Imagem' },
-  { id: 19, name: 'Ressonância Magnética', category: 'Imagem' },
-  { id: 20, name: 'Tomografia Computadorizada', category: 'Imagem' },
-  { id: 21, name: 'Eletrocardiograma', category: 'Cardiologia' },
-  { id: 22, name: 'Teste Ergométrico', category: 'Cardiologia' },
-  { id: 23, name: 'Ecocardiograma', category: 'Cardiologia' },
-  { id: 24, name: 'Colonoscopia', category: 'Endoscopia' },
-  { id: 25, name: 'Endoscopia Digestiva Alta', category: 'Endoscopia' },
-  { id: 26, name: 'Urina Tipo I', category: 'Urina' },
-  { id: 27, name: 'Urocultura', category: 'Urina' },
-  { id: 28, name: 'Papanicolau', category: 'Ginecologia' },
+// Opções para selects
+const TIPOS_EXAME = [
+  'Hemograma',
+  'Glicemia',
+  'Colesterol',
+  'Triglicerídeos',
+  'Urina',
+  'Raio-X',
+  'Ultrassom',
+  'Tomografia',
+  'Ressonância',
+  'Eletrocardiograma',
+  'Teste de Esforço',
+  'Endoscopia',
+  'Colonoscopia',
+  'Mamografia',
+  'Papanicolau',
+  'PCR',
+  'COVID-19',
+  'Outro',
 ];
 
-const clinics = [
-  { id: 1, name: 'Laboratório Exame Plus', address: 'Av. Paulista, 1000', rating: 4.8 },
-  { id: 2, name: 'Clínica Diagnóstico Avançado', address: 'Rua Augusta, 500', rating: 4.6 },
-  { id: 3, name: 'Lab Saúde Total', address: 'Av. Brigadeiro Faria Lima, 2000', rating: 4.7 },
-  { id: 4, name: 'Centro Médico Vida', address: 'Rua Oscar Freire, 800', rating: 4.9 },
-  { id: 5, name: 'Laboratório São Lucas', address: 'Av. Rebouças, 1500', rating: 4.5 },
-  { id: 6, name: 'Clínica Bem Estar', address: 'Rua Haddock Lobo, 300', rating: 4.4 },
-  { id: 7, name: 'Lab Medicina Diagnóstica', address: 'Av. Angélica, 1200', rating: 4.8 },
-  { id: 8, name: 'Instituto de Imagem', address: 'Rua da Consolação, 2500', rating: 4.6 },
-  { id: 9, name: 'Laboratório DNA', address: 'Av. São João, 500', rating: 4.7 },
-  { id: 10, name: 'Clínica Preventiva', address: 'Rua Maria Paula, 100', rating: 4.5 },
+const MEDICOS = [
+  'Dr. João Silva - Clínico Geral',
+  'Dra. Maria Santos - Cardiologista',
+  'Dr. Pedro Oliveira - Ortopedista',
+  'Dra. Ana Costa - Ginecologista',
+  'Dr. Carlos Mendes - Neurologista',
+  'Dra. Patricia Lima - Dermatologista',
+  'Dr. Ricardo Alves - Pediatra',
+  'Dra. Fernanda Rocha - Endocrinologista',
+  'Dr. Eduardo Souza - Urologista',
+  'Dra. Lucia Ferreira - Oftalmologista',
+  'Outro',
 ];
 
-const doctors = [
-  { id: 1, name: 'Dra. Ana Silva', specialty: 'Clínico Geral' },
-  { id: 2, name: 'Dr. Carlos Santos', specialty: 'Cardiologista' },
-  { id: 3, name: 'Dra. Mariana Oliveira', specialty: 'Endocrinologista' },
-  { id: 4, name: 'Dr. Roberto Almeida', specialty: 'Gastroenterologista' },
-  { id: 5, name: 'Dra. Patrícia Costa', specialty: 'Ginecologista' },
-  { id: 6, name: 'Dr. Fernando Lima', specialty: 'Ortopedista' },
-  { id: 7, name: 'Dra. Beatriz Souza', specialty: 'Dermatologista' },
-  { id: 8, name: 'Dr. Ricardo Pereira', specialty: 'Neurologista' },
+const LABORATORIOS = [
+  'Lab Diagnóstico Avançado',
+  'Lab Medicina Laboratorial',
+  'Lab Análises Clínicas',
+  'Lab Alta Precisão',
+  'Lab Central de Análises',
+  'Lab Biotec Diagnósticos',
+  'Lab Patologia Molecular',
+  'Lab Saúde Total',
+  'Lab Exame Rápido',
+  'Outro',
 ];
 
 interface AttachmentFile {
@@ -87,260 +75,184 @@ interface AttachmentFile {
   mimeType: string;
 }
 
-export default function RegisterExamScreen() {
-  const [loading, setLoading] = useState(false);
-
-  const [patientName, setPatientName] = useState('');
-  const [examType, setExamType] = useState('');
-  const [customExam, setCustomExam] = useState('');
-  const [showCustomExam, setShowCustomExam] = useState(false);
-  const [examDate, setExamDate] = useState(new Date());
+export default function CadastroExameScreen() {
+  const [saving, setSaving] = useState(false);
+  
+  // Estados do formulário
+  const [formData, setFormData] = useState({
+    paciente_nome: '',
+    tipo_exame: '',
+    data_exame: new Date(),
+    medico_solicitante: '',
+    laboratorio: '',
+    resultados: '',
+    observacoes: '',
+  });
+  
+  // Estados para selects e datepicker
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [doctorName, setDoctorName] = useState('');
-  const [laboratory, setLaboratory] = useState('');
-  const [results, setResults] = useState('');
-  const [observations, setObservations] = useState('');
-
+  const [showTipoSelect, setShowTipoSelect] = useState(false);
+  const [showMedicoSelect, setShowMedicoSelect] = useState(false);
+  const [showLaboratorioSelect, setShowLaboratorioSelect] = useState(false);
+  const [tipoCustom, setTipoCustom] = useState(false);
+  const [medicoCustom, setMedicoCustom] = useState(false);
+  const [laboratorioCustom, setLaboratorioCustom] = useState(false);
+  
+  // Estado para PDF
   const [attachment, setAttachment] = useState<AttachmentFile | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
-  
-  const [showScanner, setShowScanner] = useState(false);
-  const [processingImage, setProcessingImage] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
-  const [attachmentMethod, setAttachmentMethod] = useState<'file' | 'scan' | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
 
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('pt-BR');
+  // Funções auxiliares
+  const formatarDataExibicao = (data: Date) => {
+    const dia = String(data.getDate()).padStart(2, '0');
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const ano = data.getFullYear();
+    return `${dia}/${mes}/${ano}`;
   };
 
-  const formatDateForAPI = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+  const formatarDataAPI = (data: Date) => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setExamDate(selectedDate);
-    }
+  const formatarTamanhoArquivo = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const selectPDF = async () => {
+  // Selecionar PDF
+  const selecionarPDF = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
+      if (result.assets && result.assets[0]) {
+        const file = result.assets[0];
         setAttachment({
-          uri: asset.uri,
-          name: asset.name,
-          size: asset.size || 0,
+          uri: file.uri,
+          name: file.name,
+          size: file.size || 0,
           mimeType: 'application/pdf',
         });
-        setAttachmentMethod('file');
-        Alert.alert('Sucesso', `PDF "${asset.name}" selecionado com sucesso!`);
+        Alert.alert('Sucesso', `PDF "${file.name}" selecionado!`);
       }
-    } catch (err) {
-      console.error('Erro ao selecionar PDF:', err);
-      Alert.alert('Erro', 'Não foi possível selecionar o arquivo PDF');
+    } catch (error) {
+      console.error('❌ Erro ao selecionar PDF:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar o PDF');
     }
   };
 
-  const scanDocument = async () => {
-    const hasPermission = await requestPermission();
-    
-    if (hasPermission.granted) {
-      setShowScanner(true);
-    } else {
-      Alert.alert('Erro', 'É necessário permitir o acesso à câmera para escanear documentos');
-    }
-  };
-
-  const takePicture = async () => {
-    if (cameraRef.current) {
-      setProcessingImage(true);
-      
-      try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-        });
-
-        if (photo) {
-          // Processar imagem para melhor qualidade
-          const processedImage = await ImageManipulator.manipulateAsync(
-            photo.uri,
-            [
-              { resize: { width: 1024 } },
-            ],
-            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-          );
-
-          const imageName = `scan_${Date.now()}.jpg`;
-          
-          // Obter o tamanho do arquivo
-          let fileSize = 0;
-          try {
-            const response = await fetch(processedImage.uri);
-            const blob = await response.blob();
-            fileSize = blob.size;
-          } catch (error) {
-            console.log('Erro ao obter tamanho:', error);
-          }
-          
-          setAttachment({
-            uri: processedImage.uri,
-            name: imageName,
-            size: fileSize,
-            mimeType: 'image/jpeg',
-          });
-          setAttachmentMethod('scan');
-          setShowScanner(false);
-          
-          Alert.alert('Sucesso', 'Documento escaneado com sucesso!');
-        }
-      } catch (error) {
-        console.error('Erro ao escanear:', error);
-        Alert.alert('Erro', 'Não foi possível escanear o documento. Tente novamente.');
-      } finally {
-        setProcessingImage(false);
-      }
-    }
-  };
-
-  const removeAttachment = () => {
+  const removerPDF = () => {
     setAttachment(null);
-    setAttachmentMethod(null);
-    Alert.alert('Removido', 'Anexo removido com sucesso');
   };
 
-  const handleRegisterExam = async () => {
-    if (!patientName.trim()) {
-      Alert.alert('Erro', 'Por favor, digite o nome do paciente.');
+  // Salvar exame
+  const salvarExame = async () => {
+    // Validações
+    if (!formData.paciente_nome.trim()) {
+      Alert.alert('Erro', 'Nome do paciente é obrigatório');
+      return;
+    }
+    if (!formData.tipo_exame.trim()) {
+      Alert.alert('Erro', 'Tipo de exame é obrigatório');
+      return;
+    }
+    if (!formData.medico_solicitante.trim()) {
+      Alert.alert('Erro', 'Médico solicitante é obrigatório');
+      return;
+    }
+    if (!formData.laboratorio.trim()) {
+      Alert.alert('Erro', 'Laboratório é obrigatório');
       return;
     }
 
-    let finalExamType = examType;
-    if (showCustomExam && customExam.trim()) {
-      finalExamType = customExam.trim();
-    } else if (!examType) {
-      Alert.alert('Erro', 'Por favor, selecione ou digite o tipo do exame.');
-      return;
-    }
-
-    if (!doctorName) {
-      Alert.alert('Erro', 'Por favor, selecione o médico solicitante.');
-      return;
-    }
-
-    if (!laboratory) {
-      Alert.alert('Erro', 'Por favor, selecione o laboratório/clínica.');
-      return;
-    }
-
-    setLoading(true);
+    setSaving(true);
+    setUploadingFile(true);
 
     try {
-      const formData = new FormData();
-
-      formData.append('paciente_nome', patientName.trim());
-      formData.append('tipo_exame', finalExamType);
-      formData.append('data_exame', formatDateForAPI(examDate));
-      formData.append('medico_solicitante', doctorName);
-      formData.append('laboratorio', laboratory);
-
-      if (results.trim()) {
-        formData.append('resultados', results.trim());
+      const formDataToSend = new FormData();
+      formDataToSend.append('paciente_nome', formData.paciente_nome.trim());
+      formDataToSend.append('tipo_exame', formData.tipo_exame.trim());
+      formDataToSend.append('data_exame', formatarDataAPI(formData.data_exame));
+      formDataToSend.append('medico_solicitante', formData.medico_solicitante.trim());
+      formDataToSend.append('laboratorio', formData.laboratorio.trim());
+      
+      if (formData.resultados) {
+        formDataToSend.append('resultados', formData.resultados);
       }
-
-      if (observations.trim()) {
-        formData.append('observacoes', observations.trim());
+      if (formData.observacoes) {
+        formDataToSend.append('observacoes', formData.observacoes);
       }
 
       if (attachment) {
-        setUploadingFile(true);
-
         const fileToUpload = {
           uri: attachment.uri,
           type: attachment.mimeType,
           name: attachment.name,
         } as any;
-
-        formData.append('pdf', fileToUpload);
-        console.log(`📎 Enviando ${attachmentMethod === 'scan' ? 'imagem escaneada' : 'PDF'}:`, attachment.name);
+        formDataToSend.append('pdf', fileToUpload);
       }
 
       console.log('📡 Enviando para:', API_URL);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      console.log('📦 Dados:', {
+        paciente_nome: formData.paciente_nome,
+        tipo_exame: formData.tipo_exame,
+        data_exame: formatarDataAPI(formData.data_exame),
+        medico_solicitante: formData.medico_solicitante,
+        laboratorio: formData.laboratorio,
+        tem_pdf: !!attachment
+      });
 
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
         },
-        body: formData,
-        signal: controller.signal
+        body: formDataToSend,
       });
 
-      clearTimeout(timeoutId);
+      const data = await response.json();
 
-      let data;
-      const responseText = await response.text();
-
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Erro ao parsear JSON:', e);
-        throw new Error('Resposta inválida do servidor');
+      if (!response.ok) {
+        throw new Error(data.erro || 'Erro ao cadastrar exame');
       }
 
-      if (response.status === 201 || response.status === 200) {
-        Alert.alert(
-          'Sucesso!',
-          data.mensagem || 'Exame cadastrado com sucesso!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setPatientName('');
-                setExamType('');
-                setCustomExam('');
-                setShowCustomExam(false);
-                setExamDate(new Date());
-                setDoctorName('');
-                setLaboratory('');
-                setResults('');
-                setObservations('');
-                setAttachment(null);
-                setAttachmentMethod(null);
-                router.push('/exames');
-              }
+      Alert.alert(
+        'Sucesso!',
+        attachment ? 'Exame cadastrado com PDF anexado!' : 'Exame cadastrado com sucesso!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Limpar formulário
+              setFormData({
+                paciente_nome: '',
+                tipo_exame: '',
+                data_exame: new Date(),
+                medico_solicitante: '',
+                laboratorio: '',
+                resultados: '',
+                observacoes: '',
+              });
+              setAttachment(null);
+              setTipoCustom(false);
+              setMedicoCustom(false);
+              setLaboratorioCustom(false);
             }
-          ]
-        );
-      } else {
-        Alert.alert('Erro', data.erro || 'Erro ao cadastrar exame');
-      }
-
+          }
+        ]
+      );
+      
     } catch (error: any) {
       console.error('❌ Erro:', error);
-
-      if (error.name === 'AbortError') {
-        Alert.alert('Timeout', 'A requisição demorou muito tempo. Verifique sua conexão.');
-      } else if (error.message === 'Network request failed') {
-        Alert.alert(
-          'Erro de Rede',
-          `Não foi possível conectar ao servidor em:\n${API_URL}\n\nVerifique:\n• O backend está rodando\n• O IP está correto\n• Celular e computador estão na mesma rede Wi-Fi`
-        );
-      } else {
-        Alert.alert('Erro', error.message || 'Erro ao cadastrar exame');
-      }
+      Alert.alert('Erro', error.message || 'Não foi possível cadastrar o exame');
     } finally {
-      setLoading(false);
+      setSaving(false);
       setUploadingFile(false);
     }
   };
@@ -350,583 +262,744 @@ export default function RegisterExamScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <StatusBar style="light" />
-      <View style={styles.backgroundCircle} />
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../img/logomk.png')}
-            style={styles.logo}
-          />
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <MaterialCommunityIcons name="file-plus" size={32} color="#8B0000" />
+          <Text style={styles.headerTitle}>Cadastrar Exame</Text>
+          <Text style={styles.headerSubtitle}>Preencha os dados do exame</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.title}>Cadastro de Exame Médico</Text>
-          <Text style={styles.subtitle}>Registre os dados do exame realizado</Text>
-
-          <Text style={styles.label}>Nome do Paciente *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Digite o nome completo do paciente"
-            value={patientName}
-            onChangeText={setPatientName}
-            autoCapitalize="words"
-          />
-
-          <Text style={styles.label}>Tipo de Exame *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={examType}
-              onValueChange={(itemValue: string) => {
-                setExamType(itemValue);
-                if (itemValue === 'outro') {
-                  setShowCustomExam(true);
-                } else {
-                  setShowCustomExam(false);
-                  setCustomExam('');
-                }
-              }}
-              style={styles.picker}
-            >
-              <Picker.Item label="Selecione um exame..." value="" />
-              {commonExams.map((exam) => (
-                <Picker.Item key={exam.id} label={`${exam.name} (${exam.category})`} value={exam.name} />
-              ))}
-              <Picker.Item label="Outro (digitar manualmente)" value="outro" />
-            </Picker>
-          </View>
-
-          {showCustomExam && (
-            <TextInput
-              style={[styles.input, styles.customInput]}
-              placeholder="Digite o nome do exame"
-              value={customExam}
-              onChangeText={setCustomExam}
-              autoCapitalize="words"
-            />
-          )}
-
-          <Text style={styles.label}>Data do Exame *</Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dateButtonText}>
-              {formatDate(examDate)}
+        {/* Formulário */}
+        <View style={styles.formCard}>
+          {/* Nome do Paciente */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="account" size={16} color="#8B0000" /> 
+              {' '}Nome do Paciente *
             </Text>
-          </TouchableOpacity>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={examDate}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-              locale="pt-BR"
+            <TextInput
+              style={styles.input}
+              placeholder="Digite o nome completo do paciente"
+              placeholderTextColor="#999"
+              value={formData.paciente_nome}
+              onChangeText={(text) => setFormData({ ...formData, paciente_nome: text })}
             />
-          )}
-
-          <Text style={styles.label}>Médico Solicitante *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={doctorName}
-              onValueChange={(itemValue: string) => setDoctorName(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Selecione um médico..." value="" />
-              {doctors.map((doctor) => (
-                <Picker.Item key={doctor.id} label={`${doctor.name} - ${doctor.specialty}`} value={doctor.name} />
-              ))}
-            </Picker>
           </View>
 
-          <Text style={styles.label}>Laboratório / Clínica *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={laboratory}
-              onValueChange={(itemValue: string) => setLaboratory(itemValue)}
-              style={styles.picker}
+          {/* Tipo do Exame */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="flask" size={16} color="#8B0000" /> 
+              {' '}Tipo do Exame *
+            </Text>
+            <TouchableOpacity 
+              style={styles.selectButton}
+              onPress={() => setShowTipoSelect(true)}
             >
-              <Picker.Item label="Selecione um laboratório/clínica..." value="" />
-              {clinics.map((clinic) => (
-                <Picker.Item key={clinic.id} label={`${clinic.name} - ⭐ ${clinic.rating}`} value={clinic.name} />
-              ))}
-            </Picker>
+              <Text style={styles.selectButtonText}>
+                {formData.tipo_exame || 'Selecione o tipo de exame'}
+              </Text>
+              <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Resultados do Exame</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Descreva os resultados do exame"
-            value={results}
-            onChangeText={setResults}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
+          {/* Data do Exame */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="calendar" size={16} color="#8B0000" /> 
+              {' '}Data do Exame *
+            </Text>
+            <TouchableOpacity 
+              style={styles.selectButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.selectButtonText}>
+                {formatarDataExibicao(formData.data_exame)}
+              </Text>
+              <MaterialCommunityIcons name="calendar" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
 
-          <Text style={styles.label}>Observações</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Observações adicionais (preparo, contraindicações, etc.)"
-            value={observations}
-            onChangeText={setObservations}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
+          {/* Médico Solicitante */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="doctor" size={16} color="#8B0000" /> 
+              {' '}Médico Solicitante *
+            </Text>
+            <TouchableOpacity 
+              style={styles.selectButton}
+              onPress={() => setShowMedicoSelect(true)}
+            >
+              <Text style={styles.selectButtonText}>
+                {formData.medico_solicitante || 'Selecione o médico'}
+              </Text>
+              <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
 
-          <Text style={styles.label}>Anexar Documento</Text>
-          
-          {!attachment ? (
-            <View style={styles.attachmentOptions}>
-              <TouchableOpacity style={styles.attachButton} onPress={selectPDF}>
-                <Text style={styles.attachButtonText}>📁 Selecionar PDF</Text>
-                <Text style={styles.attachSubtext}>do dispositivo</Text>
+          {/* Laboratório */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="test-tube" size={16} color="#8B0000" /> 
+              {' '}Laboratório *
+            </Text>
+            <TouchableOpacity 
+              style={styles.selectButton}
+              onPress={() => setShowLaboratorioSelect(true)}
+            >
+              <Text style={styles.selectButtonText}>
+                {formData.laboratorio || 'Selecione o laboratório'}
+              </Text>
+              <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Resultados */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="clipboard-text" size={16} color="#666" /> 
+              {' '}Resultados
+            </Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Digite os resultados do exame..."
+              placeholderTextColor="#999"
+              value={formData.resultados}
+              onChangeText={(text) => setFormData({ ...formData, resultados: text })}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Observações */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <MaterialCommunityIcons name="note-text" size={16} color="#666" /> 
+              {' '}Observações
+            </Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Observações adicionais..."
+              placeholderTextColor="#999"
+              value={formData.observacoes}
+              onChangeText={(text) => setFormData({ ...formData, observacoes: text })}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Seção de PDF */}
+          <View style={styles.pdfSection}>
+            <Text style={styles.pdfSectionTitle}>
+              <MaterialCommunityIcons name="file-pdf-box" size={18} color="#8B0000" /> 
+              {' '}Anexar PDF (Opcional)
+            </Text>
+
+            {!attachment ? (
+              <TouchableOpacity style={styles.pdfButton} onPress={selecionarPDF}>
+                <MaterialCommunityIcons name="cloud-upload" size={24} color="#8B0000" />
+                <Text style={styles.pdfButtonText}>Selecionar PDF</Text>
+                <Text style={styles.pdfSubtext}>Clique para escolher um arquivo PDF</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.scanButton} onPress={scanDocument}>
-                <Text style={styles.scanButtonText}>📷 Escanear Documento</Text>
-                <Text style={styles.scanSubtext}>físico com a câmera</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.attachmentInfoContainer}>
-              <View style={styles.attachmentInfo}>
-                <Text style={styles.attachmentIcon}>
-                  {attachmentMethod === 'scan' ? '📷' : '📄'}
-                </Text>
-                <View style={styles.attachmentDetails}>
-                  <Text style={styles.attachmentName} numberOfLines={1}>
-                    {attachment.name}
-                  </Text>
-                  <Text style={styles.attachmentType}>
-                    {attachmentMethod === 'scan' ? 'Documento escaneado' : 'PDF do dispositivo'} • 
-                    {(attachment.size / 1024).toFixed(2)} KB
-                  </Text>
+            ) : (
+              <View style={styles.pdfInfoContainer}>
+                <View style={styles.pdfInfo}>
+                  <MaterialCommunityIcons name="file-pdf-box" size={32} color="#DC143C" />
+                  <View style={styles.pdfDetails}>
+                    <Text style={styles.pdfName} numberOfLines={1}>
+                      {attachment.name}
+                    </Text>
+                    <Text style={styles.pdfSize}>
+                      {formatarTamanhoArquivo(attachment.size)}
+                    </Text>
+                  </View>
                 </View>
+                <TouchableOpacity style={styles.removePdfButton} onPress={removerPDF}>
+                  <MaterialCommunityIcons name="delete" size={20} color="#FF4444" />
+                  <Text style={styles.removePdfText}>Remover</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.removeButton} onPress={removeAttachment}>
-                <Text style={styles.removeText}>❌ Remover</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </View>
 
           {uploadingFile && (
             <View style={styles.uploadingContainer}>
               <ActivityIndicator size="small" color="#8B0000" />
-              <Text style={styles.uploadingText}>Enviando documento...</Text>
+              <Text style={styles.uploadingText}>Enviando PDF...</Text>
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleRegisterExam}
-            disabled={loading || uploadingFile}
+          {/* Botão Salvar */}
+          <TouchableOpacity 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={salvarExame}
+            disabled={saving}
           >
-            {(loading || uploadingFile) ? (
-              <ActivityIndicator color="#FFF" />
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>CADASTRAR EXAME</Text>
+              <>
+                <MaterialCommunityIcons name="content-save" size={20} color="#FFF" />
+                <Text style={styles.saveButtonText}>CADASTRAR EXAME</Text>
+              </>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.listButton}
-            onPress={() => router.push('/exames')}
-          >
-            <Text style={styles.listText}>Ver Lista de Exames</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
+      {/* Modal de seleção - Tipo de Exame */}
       <Modal
+        visible={showTipoSelect}
+        transparent={true}
         animationType="slide"
-        transparent={false}
-        visible={showScanner}
-        onRequestClose={() => setShowScanner(false)}
+        onRequestClose={() => setShowTipoSelect(false)}
       >
-        <View style={styles.cameraContainer}>
-          <CameraView
-            ref={cameraRef}
-            style={styles.cameraFull}
-            facing="back"
-          >
-            <View style={styles.cameraOverlay}>
-              <View style={styles.scanFrameContainer}>
-                <View style={styles.scanFrame}>
-                  <View style={styles.scanCornerTL} />
-                  <View style={styles.scanCornerTR} />
-                  <View style={styles.scanCornerBL} />
-                  <View style={styles.scanCornerBR} />
-                </View>
-                <Text style={styles.scanInstruction}>
-                  Posicione o documento dentro da moldura
-                </Text>
-              </View>
-              
-              <View style={styles.cameraControls}>
-                <TouchableOpacity 
-                  style={styles.cancelScanButton}
-                  onPress={() => setShowScanner(false)}
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalContainer}>
+            <View style={styles.selectModalHeader}>
+              <Text style={styles.selectModalTitle}>Selecione o Tipo de Exame</Text>
+              <TouchableOpacity onPress={() => setShowTipoSelect(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {TIPOS_EXAME.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.selectOption}
+                  onPress={() => {
+                    setFormData({ ...formData, tipo_exame: item });
+                    setTipoCustom(false);
+                    setShowTipoSelect(false);
+                  }}
                 >
-                  <Text style={styles.cancelScanText}>Cancelar</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.captureScanButton}
-                  onPress={takePicture}
-                  disabled={processingImage}
-                >
-                  {processingImage ? (
-                    <ActivityIndicator size="large" color="#FFF" />
-                  ) : (
-                    <View style={styles.captureButtonInner} />
+                  <Text style={styles.selectOptionText}>{item}</Text>
+                  {formData.tipo_exame === item && (
+                    <MaterialCommunityIcons name="check" size={20} color="#8B0000" />
                   )}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.selectOption, styles.customOption]}
+                onPress={() => {
+                  setTipoCustom(true);
+                  setFormData({ ...formData, tipo_exame: '' });
+                  setShowTipoSelect(false);
+                }}
+              >
+                <MaterialCommunityIcons name="plus-circle" size={20} color="#8B0000" />
+                <Text style={[styles.selectOptionText, styles.customOptionText]}>
+                  Digitar outro...
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de seleção - Médico */}
+      <Modal
+        visible={showMedicoSelect}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMedicoSelect(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalContainer}>
+            <View style={styles.selectModalHeader}>
+              <Text style={styles.selectModalTitle}>Selecione o Médico</Text>
+              <TouchableOpacity onPress={() => setShowMedicoSelect(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {MEDICOS.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.selectOption}
+                  onPress={() => {
+                    setFormData({ ...formData, medico_solicitante: item });
+                    setMedicoCustom(false);
+                    setShowMedicoSelect(false);
+                  }}
+                >
+                  <Text style={styles.selectOptionText}>{item}</Text>
+                  {formData.medico_solicitante === item && (
+                    <MaterialCommunityIcons name="check" size={20} color="#8B0000" />
+                  )}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.selectOption, styles.customOption]}
+                onPress={() => {
+                  setMedicoCustom(true);
+                  setFormData({ ...formData, medico_solicitante: '' });
+                  setShowMedicoSelect(false);
+                }}
+              >
+                <MaterialCommunityIcons name="plus-circle" size={20} color="#8B0000" />
+                <Text style={[styles.selectOptionText, styles.customOptionText]}>
+                  Digitar outro...
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de seleção - Laboratório */}
+      <Modal
+        visible={showLaboratorioSelect}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowLaboratorioSelect(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalContainer}>
+            <View style={styles.selectModalHeader}>
+              <Text style={styles.selectModalTitle}>Selecione o Laboratório</Text>
+              <TouchableOpacity onPress={() => setShowLaboratorioSelect(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {LABORATORIOS.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.selectOption}
+                  onPress={() => {
+                    setFormData({ ...formData, laboratorio: item });
+                    setLaboratorioCustom(false);
+                    setShowLaboratorioSelect(false);
+                  }}
+                >
+                  <Text style={styles.selectOptionText}>{item}</Text>
+                  {formData.laboratorio === item && (
+                    <MaterialCommunityIcons name="check" size={20} color="#8B0000" />
+                  )}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.selectOption, styles.customOption]}
+                onPress={() => {
+                  setLaboratorioCustom(true);
+                  setFormData({ ...formData, laboratorio: '' });
+                  setShowLaboratorioSelect(false);
+                }}
+              >
+                <MaterialCommunityIcons name="plus-circle" size={20} color="#8B0000" />
+                <Text style={[styles.selectOptionText, styles.customOptionText]}>
+                  Digitar outro...
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DatePicker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={formData.data_exame}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, selectedDate) => {
+            setShowDatePicker(false);
+            if (selectedDate) {
+              setFormData({ ...formData, data_exame: selectedDate });
+            }
+          }}
+        />
+      )}
+
+      {/* Input customizado para Tipo */}
+      {tipoCustom && (
+        <Modal transparent={true} animationType="slide" visible={tipoCustom}>
+          <View style={styles.customInputOverlay}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o Tipo de Exame</Text>
+              <TextInput
+                style={styles.customInput}
+                autoFocus
+                value={formData.tipo_exame}
+                onChangeText={(text) => setFormData({ ...formData, tipo_exame: text })}
+                placeholder="Ex: Biópsia, Cintilografia..."
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity 
+                  style={styles.customInputCancel}
+                  onPress={() => {
+                    setTipoCustom(false);
+                    if (!formData.tipo_exame) {
+                      setFormData({ ...formData, tipo_exame: '' });
+                    }
+                  }}
+                >
+                  <Text>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.customInputConfirm}
+                  onPress={() => setTipoCustom(false)}
+                >
+                  <Text style={{ color: '#8B0000', fontWeight: 'bold' }}>OK</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </CameraView>
-        </View>
-      </Modal>
+          </View>
+        </Modal>
+      )}
+
+      {/* Input customizado para Médico */}
+      {medicoCustom && (
+        <Modal transparent={true} animationType="slide" visible={medicoCustom}>
+          <View style={styles.customInputOverlay}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o nome do Médico</Text>
+              <TextInput
+                style={styles.customInput}
+                autoFocus
+                value={formData.medico_solicitante}
+                onChangeText={(text) => setFormData({ ...formData, medico_solicitante: text })}
+                placeholder="Dr(a). Nome Completo"
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity 
+                  style={styles.customInputCancel}
+                  onPress={() => {
+                    setMedicoCustom(false);
+                    if (!formData.medico_solicitante) {
+                      setFormData({ ...formData, medico_solicitante: '' });
+                    }
+                  }}
+                >
+                  <Text>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.customInputConfirm}
+                  onPress={() => setMedicoCustom(false)}
+                >
+                  <Text style={{ color: '#8B0000', fontWeight: 'bold' }}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Input customizado para Laboratório */}
+      {laboratorioCustom && (
+        <Modal transparent={true} animationType="slide" visible={laboratorioCustom}>
+          <View style={styles.customInputOverlay}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o nome do Laboratório</Text>
+              <TextInput
+                style={styles.customInput}
+                autoFocus
+                value={formData.laboratorio}
+                onChangeText={(text) => setFormData({ ...formData, laboratorio: text })}
+                placeholder="Nome do laboratório"
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity 
+                  style={styles.customInputCancel}
+                  onPress={() => {
+                    setLaboratorioCustom(false);
+                    if (!formData.laboratorio) {
+                      setFormData({ ...formData, laboratorio: '' });
+                    }
+                  }}
+                >
+                  <Text>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.customInputConfirm}
+                  onPress={() => setLaboratorioCustom(false)}
+                >
+                  <Text style={{ color: '#8B0000', fontWeight: 'bold' }}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  // ... (mantenha os mesmos styles do código anterior)
   container: {
     flex: 1,
-    backgroundColor: '#8B0000'
-  },
-  backgroundCircle: {
-    position: 'absolute',
-    top: -100,
-    left: -50,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: '#A52A2A',
-    opacity: 0.5
+    backgroundColor: '#F5F5F5',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
-    padding: 20,
-    paddingTop: 40
+    paddingBottom: 30,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    tintColor: '#FFF',
-    resizeMode: 'contain'
-  },
-  card: {
+  header: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
     padding: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5
+    paddingTop: 60,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
-  title: {
-    fontSize: 22,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center'
+    color: '#8B0000',
+    marginTop: 12,
   },
-  subtitle: {
+  headerSubtitle: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 25
+    marginTop: 4,
+  },
+  formCard: {
+    backgroundColor: '#FFF',
+    margin: 16,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#555',
-    marginBottom: 5,
-    marginLeft: 5
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    fontSize: 16
-  },
-  customInput: {
-    marginTop: -15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#F8F9FA',
   },
   textArea: {
     minHeight: 100,
-    paddingTop: 15,
-    textAlignVertical: 'top'
+    textAlignVertical: 'top',
   },
-  dateButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0'
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333'
-  },
-  pickerContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden'
-  },
-  picker: {
-    height: 50,
-    width: '100%'
-  },
-  attachmentOptions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  attachButton: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    alignItems: 'center'
-  },
-  attachButtonText: {
-    fontSize: 14,
-    color: '#8B0000',
-    fontWeight: 'bold'
-  },
-  attachSubtext: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 2
-  },
-  scanButton: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 2,
-    borderColor: '#8B0000',
-    alignItems: 'center'
-  },
-  scanButtonText: {
-    fontSize: 14,
-    color: '#8B0000',
-    fontWeight: 'bold'
-  },
-  scanSubtext: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 2
-  },
-  attachmentInfoContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#8B0000',
+  selectButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    backgroundColor: '#F8F9FA',
   },
-  attachmentInfo: {
+  selectButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  pdfSection: {
+    marginTop: 10,
+    marginBottom: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  pdfSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  pdfButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#8B0000',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: '#FFF5F5',
+  },
+  pdfButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#8B0000',
+    marginTop: 8,
+  },
+  pdfSubtext: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  pdfInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  attachmentIcon: {
-    fontSize: 30,
-    marginRight: 10
+  pdfInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  attachmentDetails: {
-    flex: 1
+  pdfDetails: {
+    marginLeft: 12,
+    flex: 1,
   },
-  attachmentName: {
+  pdfName: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333'
+    fontWeight: '500',
+    color: '#333',
   },
-  attachmentType: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 2
+  pdfSize: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
-  removeButton: {
-    padding: 8
+  removePdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 8,
   },
-  removeText: {
+  removePdfText: {
+    color: '#FF4444',
     fontSize: 14,
-    color: '#FF0000'
+    fontWeight: '500',
   },
   uploadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    padding: 10,
+    gap: 10,
+    padding: 12,
     backgroundColor: '#FFF3E0',
-    borderRadius: 10
+    borderRadius: 10,
+    marginBottom: 20,
   },
   uploadingText: {
-    marginLeft: 10,
     fontSize: 14,
-    color: '#8B0000'
-  },
-  button: {
-    backgroundColor: '#8B0000',
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#8B0000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 3
-  },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16
-  },
-  listButton: {
-    alignItems: 'center',
-    marginTop: 20
-  },
-  listText: {
     color: '#8B0000',
-    fontSize: 14,
-    fontWeight: 'bold'
   },
-  cameraContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  cameraFull: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'space-between',
-  },
-  scanFrameContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  saveButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#8B0000',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 10,
   },
-  scanFrame: {
-    width: '85%',
-    height: '45%',
-    position: 'relative',
+  saveButtonDisabled: {
+    backgroundColor: '#CC6666',
+    opacity: 0.7,
   },
-  scanCornerTL: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 40,
-    height: 40,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#8B0000',
-  },
-  scanCornerTR: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#8B0000',
-  },
-  scanCornerBL: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    width: 40,
-    height: 40,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#8B0000',
-  },
-  scanCornerBR: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#8B0000',
-  },
-  scanInstruction: {
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#FFF',
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 14,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 8,
-    borderRadius: 8,
   },
-  cameraControls: {
+  selectModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  selectModalContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  selectModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 30,
-    marginBottom: 30,
-  },
-  cancelScanButton: {
-    padding: 15,
-    backgroundColor: '#FF0000',
-    borderRadius: 10,
-    minWidth: 100,
     alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
-  cancelScanText: {
-    color: '#FFF',
+  selectModalTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 16,
+    color: '#333',
   },
-  captureScanButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  selectOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  selectOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  customOption: {
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    marginTop: 8,
+    backgroundColor: '#FFF5F5',
+  },
+  customOptionText: {
+    color: '#8B0000',
+    fontWeight: '500',
+  },
+  customInputOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  customInputContainer: {
     backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '80%',
+  },
+  customInputTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  customInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  customInputButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  customInputCancel: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  customInputConfirm: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
 });
