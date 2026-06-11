@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import IP from '../../service/api';
+import IP from '../service/api';
 
 // URL da API
 const API_URL = `http://${IP}:3000/api/exames`;

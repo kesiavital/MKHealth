@@ -182,6 +182,29 @@ export default function LoginScreen() {
     }
   };
 
+  // Função para navegar para o cadastro
+  const navigateToRegister = () => {
+    console.log('🔵🔵🔵 NAVEGANDO PARA CADASTRO 🔵🔵🔵');
+    console.log('🔵 Router disponível:', !!router);
+    
+    try {
+      // Tenta diferentes formas de navegação
+      router.push('/RegisterScreen' as any);
+      console.log('✅ Navegação executada com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro na navegação:', error);
+      
+      // Fallback: tenta outra forma
+      try {
+        router.push('RegisterScreen' as any);
+        console.log('✅ Navegação fallback executada!');
+      } catch (error2) {
+        console.error('❌ Fallback também falhou:', error2);
+        Alert.alert('Erro', 'Não foi possível abrir a tela de cadastro');
+      }
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -258,11 +281,11 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
 
-          {/* CADASTRO */}
+          {/* CADASTRO - CORRIGIDO */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Não possui conta?</Text>
             <TouchableOpacity
-              onPress={() => router.push('/RegisterScreen')}
+              onPress={navigateToRegister}
               disabled={loading}
             >
               <Text style={styles.registerLink}> Cadastre-se</Text>

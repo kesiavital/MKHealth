@@ -56,8 +56,8 @@ function CustomDrawerContent(props: any) {
     }
   };
 
-  // Não mostra drawer na tela de login
-  if (pathname === '/login') return null;
+  // CORRIGIDO: Não mostra drawer na tela de login E nem no cadastro
+  if (pathname === '/login' || pathname === '/RegisterScreen') return null;
 
   // Menu items personalizados
   const menuItems: { label: string; icon: string; route: Href }[] = [
@@ -143,9 +143,11 @@ export default function RootLayout() {
     );
   }
 
-  // Se não estiver autenticado e não estiver na tela de login, redireciona
-  if (!isAuthenticatedState && pathname !== '/login') {
+  // CORRIGIDO: Permite acesso ao RegisterScreen mesmo sem estar autenticado
+  // Se não estiver autenticado e não estiver na tela de login OU na tela de cadastro, redireciona
+  if (!isAuthenticatedState && pathname !== '/login' && pathname !== '/RegisterScreen') {
     console.log('🚀 Redirecionando para login...');
+    console.log('📍 Pathname atual:', pathname);
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Redirect href="/login" />
@@ -177,11 +179,11 @@ export default function RootLayout() {
           <Drawer.Screen name="(tabs)" options={{ title: 'Home' }} />
           <Drawer.Screen name="sobre" options={{ title: 'Sobre' }} />
           <Drawer.Screen name="login" options={{ drawerItemStyle: { display: 'none' } }} />
+          <Drawer.Screen name="RegisterScreen" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="index" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="admin" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="modal" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="esqueci" options={{ drawerItemStyle: { display: 'none' } }} />
-          <Drawer.Screen name="RegisterScreen" options={{ drawerItemStyle: { display: 'none' } }} />
         </Drawer>
       </ExamesProvider>
     </GestureHandlerRootView>
