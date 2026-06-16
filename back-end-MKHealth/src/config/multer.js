@@ -2,10 +2,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Garantir que a pasta uploads existe
-const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+// Garantir que a pasta uploads/foto existe
+const uploadDir = path.join(__dirname, '..', 'uploads', 'foto');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('📸 Pasta criada:', uploadDir);
 }
 
 const storage = multer.diskStorage({
@@ -15,7 +16,9 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `foto-${uniqueSuffix}${ext}`);
+    const filename = `foto-${uniqueSuffix}${ext}`;
+    console.log('📸 Salvando arquivo:', filename);
+    cb(null, filename);
   }
 });
 
@@ -25,7 +28,7 @@ const fileFilter = (req, file, cb) => {
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (mimetype && extname) {
-    return cb(null, true);
+    cb(null, true);
   } else {
     cb(new Error('Apenas imagens são permitidas (jpeg, jpg, png, gif, webp)'));
   }

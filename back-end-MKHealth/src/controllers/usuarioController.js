@@ -1,6 +1,8 @@
 const Usuario = require("../models/Usuario");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const path = require("path");
 
 function validarCPF(cpf) {
   const cpfClean = cpf.replace(/[^\d]/g, '');
@@ -44,11 +46,16 @@ module.exports = {
     try {
       console.log('📝 Iniciando cadastro...');
       console.log('📝 Body recebido:', req.body);
+      console.log('📸 Arquivo recebido:', req.file);
       
       const { nome_completo, email, cpf, senha } = req.body;
 
       // Validação de campos obrigatórios
       if (!nome_completo || !email || !cpf || !senha) {
+        // Se erro e tem foto, deletar
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
         return res.status(400).json({ 
           erro: "Todos os campos são obrigatórios" 
         });
@@ -56,6 +63,9 @@ module.exports = {
 
       // Validação do CPF
       if (!validarCPF(cpf)) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
         return res.status(400).json({ 
           erro: "CPF inválido" 
         });
@@ -68,12 +78,20 @@ module.exports = {
       const senhaHash = await bcrypt.hash(senha, 10);
       console.log('✅ Senha hasheada');
 
+      // Processar foto se foi enviada
+      let foto = null;
+      if (req.file) {
+        foto = `/uploads/foto/${req.file.filename}`;
+        console.log('📸 Foto salva:', foto);
+      }
+
       // Criar usuário
       const usuario = await Usuario.create({
         nome_completo: nome_completo.trim(),
         email: email.trim().toLowerCase(),
         cpf: cpfLimpo,
         senha_hash: senhaHash,
+        foto: foto
       });
 
       console.log('✅ Usuário criado com ID:', usuario.id);
@@ -87,17 +105,23 @@ module.exports = {
           nome_completo: usuario.nome_completo,
           email: usuario.email,
           cpf: formatarCPF(usuario.cpf),
+          foto: usuario.foto
         }
       });
 
     } catch (error) {
       console.error('❌ Erro detalhado no cadastro:', error);
       
+      // Se houve erro e uma foto foi enviada, deletar a foto
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+        console.log('🗑️ Foto deletada devido ao erro');
+      }
+      
       // Tratamento específico para erro de unicidade (duplicado)
       if (error.name === 'SequelizeUniqueConstraintError') {
         let mensagem = 'Email ou CPF já cadastrado';
         
-        // Tenta identificar qual campo foi duplicado
         if (error.fields) {
           if (error.fields.email) {
             mensagem = 'E-mail já cadastrado';
@@ -106,7 +130,6 @@ module.exports = {
           }
         }
         
-        // Verifica a mensagem do erro
         const errorMessage = error.message || '';
         if (errorMessage.includes('email')) {
           mensagem = 'E-mail já cadastrado';
@@ -118,13 +141,11 @@ module.exports = {
         return res.status(409).json({ erro: mensagem });
       }
       
-      // Tratamento para erro de validação
       if (error.name === 'SequelizeValidationError') {
         const mensagens = error.errors.map(err => err.message).join(', ');
         return res.status(400).json({ erro: mensagens });
       }
       
-      // Outros erros
       return res.status(500).json({ 
         erro: "Erro interno do servidor",
         detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -193,6 +214,7 @@ module.exports = {
           nome_completo: usuario.nome_completo,
           email: usuario.email,
           cpf: formatarCPF(usuario.cpf),
+          foto: usuario.foto
         },
         token
       });
@@ -217,7 +239,8 @@ module.exports = {
         id: u.id,
         nome_completo: u.nome_completo,
         email: u.email,
-        cpf: formatarCPF(u.cpf)
+        cpf: formatarCPF(u.cpf),
+        foto: u.foto
       }));
       
       return res.json(usuariosFormatados);
@@ -246,12 +269,79 @@ module.exports = {
         id: usuario.id,
         nome_completo: usuario.nome_completo,
         email: usuario.email,
-        cpf: formatarCPF(usuario.cpf)
+        cpf: formatarCPF(usuario.cpf),
+        foto: usuario.foto
       });
     } catch (error) {
       console.error('❌ Erro ao buscar por ID:', error);
       return res.status(500).json({ 
         erro: error.message 
+      });
+    }
+  },
+
+  // ATUALIZAR FOTO
+  async atualizarFoto(req, res) {
+    try {
+      console.log('📸 Atualizando foto...');
+      console.log('📝 ID do usuário:', req.params.id);
+      console.log('📸 Arquivo:', req.file);
+
+      const { id } = req.params;
+
+      const usuario = await Usuario.findByPk(id);
+
+      if (!usuario) {
+        if (req.file && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(404).json({ 
+          erro: "Usuário não encontrado" 
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ 
+          erro: "Nenhuma imagem foi enviada" 
+        });
+      }
+
+      // Deletar foto antiga se existir
+      if (usuario.foto) {
+        const oldFotoPath = path.join(__dirname, '..', usuario.foto);
+        if (fs.existsSync(oldFotoPath)) {
+          fs.unlinkSync(oldFotoPath);
+          console.log('🗑️ Foto antiga deletada:', oldFotoPath);
+        }
+      }
+
+      // Salvar nova foto
+      const novaFoto = `/uploads/foto/${req.file.filename}`;
+      await usuario.update({ foto: novaFoto });
+
+      console.log('✅ Foto atualizada com sucesso:', novaFoto);
+
+      return res.json({
+        sucesso: true,
+        mensagem: "Foto atualizada com sucesso",
+        usuario: {
+          id: usuario.id,
+          nome_completo: usuario.nome_completo,
+          email: usuario.email,
+          cpf: formatarCPF(usuario.cpf),
+          foto: novaFoto
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao atualizar foto:', error);
+      
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      return res.status(500).json({ 
+        erro: "Erro interno do servidor"
       });
     }
   },
@@ -265,6 +355,15 @@ module.exports = {
         return res.status(404).json({ 
           erro: "Usuário não encontrado" 
         });
+      }
+      
+      // Deletar foto do sistema se existir
+      if (usuario.foto) {
+        const fotoPath = path.join(__dirname, '..', usuario.foto);
+        if (fs.existsSync(fotoPath)) {
+          fs.unlinkSync(fotoPath);
+          console.log('🗑️ Foto deletada do sistema:', fotoPath);
+        }
       }
       
       await usuario.destroy();

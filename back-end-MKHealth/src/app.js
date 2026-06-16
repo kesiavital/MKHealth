@@ -34,10 +34,17 @@ app.get('/health', (req, res) => {
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
 
-// Verificar se a pasta existe
+// Verificar se a pasta uploads existe
 if (!fs.existsSync(uploadsPath)) {
   console.log('⚠️ Pasta uploads não existe, criando...');
   fs.mkdirSync(uploadsPath, { recursive: true });
+}
+
+// Criar pasta para fotos
+const fotosPath = path.join(uploadsPath, 'foto');
+if (!fs.existsSync(fotosPath)) {
+  console.log('📸 Pasta foto não existe, criando...');
+  fs.mkdirSync(fotosPath, { recursive: true });
 }
 
 // Verificar se a pasta exams existe
@@ -69,11 +76,27 @@ app.get('/debug/check-pdf', (req, res) => {
   });
 });
 
+// Rota de debug para verificar fotos
+app.get('/debug/check-fotos', (req, res) => {
+  const fotosPathFull = path.join(__dirname, 'uploads', 'foto');
+  let filesInFotos = [];
+  
+  if (fs.existsSync(fotosPathFull)) {
+    filesInFotos = fs.readdirSync(fotosPathFull);
+  }
+  
+  res.json({
+    fotos_path: fotosPathFull,
+    arquivos_na_pasta_fotos: filesInFotos,
+    total_fotos: filesInFotos.length
+  });
+});
+
 // Usar as rotas da API
 app.use("/api/usuarios", routes);
 app.use("/api/exames", exameRoutes);
 
-// Rota de login
+// Rota de login (já está nas rotas de usuário, mas mantida para compatibilidade)
 app.post("/logar", usuarioController.logar);
 
 // Middleware 404

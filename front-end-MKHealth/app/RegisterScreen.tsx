@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
@@ -14,9 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import IP from '../service/api';
-// URL do seu backend - ALTERE PARA O IP DO SEU COMPUTADOR
-const API_URL = `http://${IP}/api/usuarios`;
+import { BASE_URL, USUARIOS_URL } from '../service/api';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
@@ -31,11 +30,107 @@ export default function RegisterScreen() {
   // Estados para mostrar/ocultar senha
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Estado para foto
+  const [foto, setFoto] = useState<string | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
+  // Solicitar permissão para acessar galeria/câmera
+  const requestPermissions = async (): Promise<boolean> => {
+    if (Platform.OS !== 'web') {
+      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (cameraStatus !== 'granted' && libraryStatus !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de acesso à câmera e galeria para adicionar foto.');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Tirar foto com a câmera
+  const tirarFoto = async (): Promise<void> => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    setUploading(true);
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        setFoto(asset.uri);
+        setFotoBase64(asset.base64 || null);
+      }
+    } catch (error) {
+      console.error('Erro ao tirar foto:', error);
+      Alert.alert('Erro', 'Não foi possível tirar a foto.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Escolher da galeria
+  const escolherFotoGaleria = async (): Promise<void> => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    setUploading(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        setFoto(asset.uri);
+        setFotoBase64(asset.base64 || null);
+      }
+    } catch (error) {
+      console.error('Erro ao escolher foto:', error);
+      Alert.alert('Erro', 'Não foi possível escolher a foto.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Remover foto
+  const removerFoto = (): void => {
+    setFoto(null);
+    setFotoBase64(null);
+  };
+
+  // Opções para adicionar foto
+  const adicionarFoto = (): void => {
+    Alert.alert(
+      'Adicionar Foto',
+      'Escolha uma opção',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: '📷 Tirar Foto', onPress: () => tirarFoto() },
+        { text: '🖼️ Escolher da Galeria', onPress: () => escolherFotoGaleria() },
+        ...(foto ? [{ text: '🗑️ Remover Foto', onPress: () => removerFoto(), style: 'destructive' as const }] : [])
+      ]
+    );
+  };
+
+  // Validação de CPF
   const validateCPF = (cpf: string): boolean => {
     const cpfClean = cpf.replace(/[^\d]/g, '');
     if (cpfClean.length !== 11) return false;
-    
     if (/^(\d)\1{10}$/.test(cpfClean)) return false;
     
     let soma = 0;
@@ -57,6 +152,7 @@ export default function RegisterScreen() {
     return true;
   };
 
+  // Formatar CPF com máscara
   const formatCPF = (value: string): string => {
     const cpfClean = value.replace(/[^\d]/g, '');
     if (cpfClean.length <= 3) return cpfClean;
@@ -65,28 +161,21 @@ export default function RegisterScreen() {
     return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3, 6)}.${cpfClean.slice(6, 9)}-${cpfClean.slice(9, 11)}`;
   };
 
-  // Função para testar conexão com o servidor
-  const testServerConnection = async (): Promise<boolean> => {
-    try {
-      console.log('🔍 Testando conexão com o servidor...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(API_URL, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('✅ Servidor respondendo na porta 3000');
-      return true;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error('❌ Servidor não responde:', errorMessage);
-      return false;
-    }
+  // Limpar CPF
+  const limparCPF = (cpf: string): string => cpf.replace(/[^\d]/g, '');
+
+  // Validar email
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
+  // Converter base64 para blob
+  const base64ToBlob = async (base64: string): Promise<Blob> => {
+    return fetch(`data:image/jpeg;base64,${base64}`).then(res => res.blob());
+  };
+
+  // Enviar cadastro
   const handleRegister = async (): Promise<void> => {
     // Validações
     if (!name.trim()) {
@@ -99,8 +188,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!validateEmail(email)) {
       Alert.alert('Erro', 'Por favor, digite um e-mail válido.');
       return;
     }
@@ -126,71 +214,62 @@ export default function RegisterScreen() {
     }
 
     setLoading(true);
-    
-    // Testar conexão primeiro
-    const isConnected = await testServerConnection();
-    if (!isConnected) {
-      Alert.alert(
-        'Erro de Conexão',
-        'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando (npm start)\n✓ O IP está correto: ' + API_URL + '\n✓ Celular e computador estão na mesma rede Wi-Fi\n✓ Firewall não está bloqueando a porta 3000'
-      );
-      setLoading(false);
-      return;
-    }
 
     try {
-      const cpfLimpo = cpf.replace(/[^\d]/g, '');
+      const cpfLimpo = limparCPF(cpf);
+      
+      // Usando a mesma URL padrão que funciona nos exames
+      const cadastroUrl = `${USUARIOS_URL}/cadastro`;
+      
+      console.log('📡 ========== INICIANDO CADASTRO ==========');
+      console.log('📡 URL:', cadastroUrl);
+      console.log('📡 BASE_URL:', BASE_URL);
+      console.log('📡 USUARIOS_URL:', USUARIOS_URL);
+      console.log('📡 Dados:', { name, email, cpf: cpfLimpo, hasFoto: !!fotoBase64 });
+      
+      // Teste de conectividade primeiro (igual aos exames)
+      console.log('🔍 Testando conectividade...');
+      const healthResponse = await fetch(`${BASE_URL}/health`);
+      console.log('✅ Health check status:', healthResponse.status);
+      
+      if (!healthResponse.ok) {
+        throw new Error(`Servidor não respondeu: ${healthResponse.status}`);
+      }
+      
+      const healthData = await healthResponse.json();
+      console.log('✅ Servidor OK:', healthData);
+      
+      // Criar FormData para enviar com foto
+      const formData = new FormData();
+      formData.append('nome_completo', name.trim());
+      formData.append('email', email.trim().toLowerCase());
+      formData.append('cpf', cpfLimpo);
+      formData.append('senha', password);
+      
+      // Adicionar foto se existir
+      if (fotoBase64) {
+        console.log('📸 Convertendo foto...');
+        const blob = await base64ToBlob(fotoBase64);
+        formData.append('foto', blob, 'foto.jpg');
+        console.log('📸 Foto adicionada ao formulário');
+      }
       
       console.log('📡 Enviando requisição POST...');
-      console.log('📡 URL:', `${API_URL}/`);
-      console.log('📡 Dados:', {
-        nome_completo: name.trim(),
-        email: email.trim(),
-        cpf: cpfLimpo,
-        senha: '***'
-      });
       
-      // Timeout de 15 segundos
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
-      const response = await fetch(`${API_URL}/`, {
+      const response = await fetch(cadastroUrl, {
         method: 'POST',
+        body: formData,
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          nome_completo: name.trim(),
-          email: email.trim(),
-          cpf: cpfLimpo,
-          senha: password
-        }),
-        signal: controller.signal
       });
-      
-      clearTimeout(timeoutId);
       
       console.log('📡 Status da resposta:', response.status);
       
-      // Verifica se a resposta tem conteúdo
-      const textResponse = await response.text();
-      console.log('📡 Resposta RAW:', textResponse);
+      const data = await response.json();
+      console.log('📡 Resposta:', JSON.stringify(data, null, 2));
       
-      if (!textResponse || textResponse.trim() === '') {
-        throw new Error('Servidor retornou resposta vazia.');
-      }
-      
-      // Tenta fazer o parse do JSON
-      let data: any;
-      try {
-        data = JSON.parse(textResponse);
-      } catch (parseError: unknown) {
-        console.error('❌ Erro ao fazer parse do JSON:', parseError);
-        throw new Error('Resposta do servidor inválida.');
-      }
-      
-      // Tratamento de erros baseado no status
+      // Tratamento de erros
       if (response.status === 400) {
         Alert.alert('Erro de Validação', data.erro || 'Dados inválidos');
         return;
@@ -217,25 +296,16 @@ export default function RegisterScreen() {
         ]
       );
       
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      const errorName = error instanceof Error ? error.name : '';
-      
+    } catch (error: any) {
       console.error('❌ Erro detalhado:', error);
       
-      // Tratamento específico para diferentes erros
-      if (errorName === 'AbortError') {
+      if (error.message === 'Network request failed') {
         Alert.alert(
-          'Timeout', 
-          'A requisição demorou muito tempo. Verifique sua conexão.'
-        );
-      } else if (errorMessage === 'Network request failed') {
-        Alert.alert(
-          'Erro de Rede',
-          'Não foi possível conectar ao servidor.\n\nVerifique:\n✓ O backend está rodando\n✓ O IP está correto: ' + API_URL + '\n✓ O celular está na mesma rede Wi-Fi\n✓ O firewall não está bloqueando a porta 3000'
+          'Erro de Conexão',
+          `Não foi possível conectar ao servidor.\n\nURL tentada:\n${USUARIOS_URL}/cadastro\n\nVerifique:\n• Backend está rodando (npm start)\n• IP correto: ${BASE_URL}\n• Mesma rede Wi-Fi\n• Firewall não está bloqueando`
         );
       } else {
-        Alert.alert('Erro', errorMessage || 'Erro ao realizar cadastro.');
+        Alert.alert('Erro', error.message || 'Erro ao realizar cadastro.');
       }
     } finally {
       setLoading(false);
@@ -250,7 +320,11 @@ export default function RegisterScreen() {
       <StatusBar style="light" />
       <View style={styles.backgroundCircle} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.logoContainer}>
           <Image
             source={require('./img/logomk.png')}
@@ -262,33 +336,60 @@ export default function RegisterScreen() {
           <Text style={styles.title}>Crie sua conta</Text>
           <Text style={styles.subtitle}>Cadastre-se para acessar seus exames</Text>
 
+          {/* Botão para adicionar foto */}
+          <TouchableOpacity 
+            style={styles.fotoContainer} 
+            onPress={adicionarFoto}
+            activeOpacity={0.8}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <View style={styles.fotoPlaceholder}>
+                <ActivityIndicator size="large" color="#8B0000" />
+              </View>
+            ) : foto ? (
+              <Image source={{ uri: foto }} style={styles.fotoPerfil} />
+            ) : (
+              <View style={styles.fotoPlaceholder}>
+                <Text style={styles.fotoPlaceholderEmoji}>📷</Text>
+                <Text style={styles.fotoPlaceholderText}>Adicionar Foto</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           <Text style={styles.label}>Nome Completo</Text>
           <TextInput
             style={styles.input}
             placeholder="Digite seu nome completo"
+            placeholderTextColor="#999"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
+            editable={!loading}
           />
 
           <Text style={styles.label}>E-mail</Text>
           <TextInput
             style={styles.input}
             placeholder="Digite seu e-mail"
+            placeholderTextColor="#999"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!loading}
           />
 
           <Text style={styles.label}>CPF</Text>
           <TextInput
             style={styles.input}
             placeholder="000.000.000-00"
+            placeholderTextColor="#999"
             value={cpf}
             onChangeText={(text) => setCpf(formatCPF(text))}
             keyboardType="numeric"
             maxLength={14}
+            editable={!loading}
           />
 
           <Text style={styles.label}>Senha</Text>
@@ -296,13 +397,16 @@ export default function RegisterScreen() {
             <TextInput
               style={styles.passwordInput}
               placeholder="Digite sua senha"
+              placeholderTextColor="#999"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              editable={!loading}
             />
             <TouchableOpacity
               style={styles.eyeButton}
               onPress={() => setShowPassword(!showPassword)}
+              disabled={loading}
             >
               <Text style={styles.eyeIcon}>
                 {showPassword ? '👁️' : '👁️‍🗨️'}
@@ -315,13 +419,16 @@ export default function RegisterScreen() {
             <TextInput
               style={styles.passwordInput}
               placeholder="Confirme sua senha"
+              placeholderTextColor="#999"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
+              editable={!loading}
             />
             <TouchableOpacity
               style={styles.eyeButton}
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              disabled={loading}
             >
               <Text style={styles.eyeIcon}>
                 {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
@@ -330,18 +437,22 @@ export default function RegisterScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <Text style={styles.buttonText}>CADASTRAR</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/')}>
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={() => router.push('/')}
+            disabled={loading}
+          >
             <Text style={styles.loginText}>Já tenho conta? Faça login</Text>
           </TouchableOpacity>
         </View>
@@ -367,13 +478,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     padding: 20,
-    paddingTop: 40
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 10
+    marginBottom: 20
   },
   logo: {
     width: 120,
@@ -384,7 +496,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFF',
     borderRadius: 20,
-    padding: 30,
+    padding: 25,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -404,7 +516,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 25
+    marginBottom: 20
+  },
+  fotoContainer: {
+    alignSelf: 'center',
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  fotoPerfil: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
+    borderColor: '#8B0000',
+  },
+  fotoPlaceholder: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#8B0000',
+    borderStyle: 'dashed',
+  },
+  fotoPlaceholderEmoji: {
+    fontSize: 40,
+    marginBottom: 5,
+  },
+  fotoPlaceholderText: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
   },
   label: {
     fontSize: 14,
@@ -414,28 +558,30 @@ const styles = StyleSheet.create({
     marginLeft: 5
   },
   input: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8F9FA',
     borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+    padding: 14,
+    marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#E0E0E0'
+    borderColor: '#E0E0E0',
+    fontSize: 15,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8F9FA',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    marginBottom: 20
+    marginBottom: 15
   },
   passwordInput: {
     flex: 1,
-    padding: 15
+    padding: 14,
+    fontSize: 15,
   },
   eyeButton: {
-    padding: 15
+    paddingHorizontal: 15,
   },
   eyeIcon: {
     fontSize: 20,
@@ -443,7 +589,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#8B0000',
-    padding: 18,
+    padding: 16,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
@@ -452,9 +598,13 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2
     },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 3
+  },
+  buttonDisabled: {
+    backgroundColor: '#CC6666',
+    opacity: 0.7
   },
   buttonText: {
     color: '#FFF',
