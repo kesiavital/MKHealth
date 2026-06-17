@@ -5,9 +5,29 @@ const fs = require("fs");
 const path = require("path");
 
 function validarCPF(cpf) {
+  console.log('🔍 [VALIDAR CPF] CPF recebido:', cpf);
+  console.log('🔍 [VALIDAR CPF] Tipo do CPF:', typeof cpf);
+  console.log('🔍 [VALIDAR CPF] Comprimento:', cpf?.length);
+  console.log('🔍 [VALIDAR CPF] Caracteres:', cpf?.split('').map(c => ({ char: c, code: c.charCodeAt(0) })));
+  
+  if (!cpf) {
+    console.log('❌ [VALIDAR CPF] CPF é null ou undefined');
+    return false;
+  }
+  
   const cpfClean = cpf.replace(/[^\d]/g, '');
-  if (cpfClean.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(cpfClean)) return false;
+  console.log('🔍 [VALIDAR CPF] CPF limpo:', cpfClean);
+  console.log('🔍 [VALIDAR CPF] Tamanho do CPF limpo:', cpfClean.length);
+  
+  if (cpfClean.length !== 11) {
+    console.log('❌ [VALIDAR CPF] Tamanho inválido - esperado 11, recebido:', cpfClean.length);
+    return false;
+  }
+  
+  if (/^(\d)\1{10}$/.test(cpfClean)) {
+    console.log('❌ [VALIDAR CPF] CPF com todos dígitos iguais');
+    return false;
+  }
   
   let soma = 0;
   let resto;
@@ -17,7 +37,10 @@ function validarCPF(cpf) {
   }
   resto = 11 - (soma % 11);
   if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpfClean.charAt(9))) return false;
+  if (resto !== parseInt(cpfClean.charAt(9))) {
+    console.log('❌ [VALIDAR CPF] Primeiro dígito verificador inválido');
+    return false;
+  }
   
   soma = 0;
   for (let i = 0; i < 10; i++) {
@@ -25,8 +48,12 @@ function validarCPF(cpf) {
   }
   resto = 11 - (soma % 11);
   if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpfClean.charAt(10))) return false;
+  if (resto !== parseInt(cpfClean.charAt(10))) {
+    console.log('❌ [VALIDAR CPF] Segundo dígito verificador inválido');
+    return false;
+  }
   
+  console.log('✅ [VALIDAR CPF] CPF válido!');
   return true;
 }
 
@@ -37,55 +64,83 @@ function formatarCPF(cpf) {
 }
 
 function limparCPF(cpf) {
-  return cpf.replace(/[^\d]/g, '');
+  if (!cpf) return '';
+  console.log('🧹 [LIMPAR CPF] Recebido:', cpf);
+  console.log('🧹 [LIMPAR CPF] Tipo:', typeof cpf);
+  const limpo = cpf.replace(/[^\d]/g, '');
+  console.log('🧹 [LIMPAR CPF] Resultado:', limpo);
+  console.log('🧹 [LIMPAR CPF] Tamanho:', limpo.length);
+  return limpo;
 }
 
 module.exports = {
-  // CADASTRO
+  // CADASTRO - ROTA: /cadastro
   async criar(req, res) {
     try {
-      console.log('📝 Iniciando cadastro...');
+      console.log('\n📝 ========== INICIANDO CADASTRO ==========');
       console.log('📝 Body recebido:', req.body);
-      console.log('📸 Arquivo recebido:', req.file);
+      console.log('📝 Body keys:', Object.keys(req.body));
+      console.log('📝 File recebido:', req.file ? 'SIM - ' + req.file.filename : 'NÃO');
       
       const { nome_completo, email, cpf, senha } = req.body;
 
-      // Validação de campos obrigatórios
+      console.log('\n🆔 ====== CPF RECEBIDO ======');
+      console.log('🆔 Valor:', cpf);
+      console.log('🆔 Tipo:', typeof cpf);
+      console.log('🆔 Tamanho:', cpf?.length);
+      console.log('🆔 Caracteres (códigos):', cpf?.split('').map(c => c.charCodeAt(0)));
+      console.log('🆔 Caracteres (visuais):', cpf?.split('').map(c => `'${c}'`));
+      console.log('🆔 ============================\n');
+
       if (!nome_completo || !email || !cpf || !senha) {
-        // Se erro e tem foto, deletar
+        console.log('❌ Campos obrigatórios faltando');
         if (req.file) {
           fs.unlinkSync(req.file.path);
         }
-        return res.status(400).json({ 
-          erro: "Todos os campos são obrigatórios" 
-        });
+        return res.status(400).json({ erro: "Todos os campos são obrigatórios" });
       }
 
-      // Validação do CPF
-      if (!validarCPF(cpf)) {
+      console.log('🔐 ====== VALIDANDO CPF ======');
+      const cpfValido = validarCPF(cpf);
+      console.log('🔐 Resultado:', cpfValido);
+      console.log('🔐 ============================\n');
+      
+      if (!cpfValido) {
+        console.log('❌ CPF inválido!');
         if (req.file) {
           fs.unlinkSync(req.file.path);
         }
-        return res.status(400).json({ 
-          erro: "CPF inválido" 
-        });
+        return res.status(400).json({ erro: "CPF inválido" });
       }
 
       const cpfLimpo = limparCPF(cpf);
-      console.log('✅ CPF válido:', cpfLimpo);
+      console.log('✅ CPF limpo final:', cpfLimpo);
       
-      // Hash da senha
       const senhaHash = await bcrypt.hash(senha, 10);
       console.log('✅ Senha hasheada');
 
-      // Processar foto se foi enviada
       let foto = null;
       if (req.file) {
         foto = `/uploads/foto/${req.file.filename}`;
         console.log('📸 Foto salva:', foto);
       }
 
-      // Criar usuário
+      console.log('🔍 Verificando se CPF já existe:', cpfLimpo);
+      const usuarioExistente = await Usuario.findOne({ where: { cpf: cpfLimpo } });
+      if (usuarioExistente) {
+        console.log('❌ CPF já cadastrado! ID:', usuarioExistente.id);
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(409).json({ erro: "CPF já cadastrado" });
+      }
+
+      console.log('\n💾 ====== CRIANDO USUÁRIO ======');
+      console.log('  - nome_completo:', nome_completo.trim());
+      console.log('  - email:', email.trim().toLowerCase());
+      console.log('  - cpf:', cpfLimpo);
+      console.log('  - cpf tamanho:', cpfLimpo.length);
+
       const usuario = await Usuario.create({
         nome_completo: nome_completo.trim(),
         email: email.trim().toLowerCase(),
@@ -94,9 +149,10 @@ module.exports = {
         foto: foto
       });
 
-      console.log('✅ Usuário criado com ID:', usuario.id);
+      console.log('\n✅ Usuário criado com ID:', usuario.id);
+      console.log('✅ CPF salvo:', usuario.cpf);
+      console.log('📝 ========== FIM CADASTRO ==========\n');
 
-      // Resposta de sucesso
       return res.status(201).json({
         sucesso: true,
         mensagem: "Cadastro realizado com sucesso",
@@ -110,34 +166,19 @@ module.exports = {
       });
 
     } catch (error) {
-      console.error('❌ Erro detalhado no cadastro:', error);
+      console.error('❌ Erro no cadastro:', error);
+      console.error('❌ Stack:', error.stack);
       
-      // Se houve erro e uma foto foi enviada, deletar a foto
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
-        console.log('🗑️ Foto deletada devido ao erro');
       }
       
-      // Tratamento específico para erro de unicidade (duplicado)
       if (error.name === 'SequelizeUniqueConstraintError') {
         let mensagem = 'Email ou CPF já cadastrado';
-        
         if (error.fields) {
-          if (error.fields.email) {
-            mensagem = 'E-mail já cadastrado';
-          } else if (error.fields.cpf) {
-            mensagem = 'CPF já cadastrado';
-          }
+          if (error.fields.email) mensagem = 'E-mail já cadastrado';
+          else if (error.fields.cpf) mensagem = 'CPF já cadastrado';
         }
-        
-        const errorMessage = error.message || '';
-        if (errorMessage.includes('email')) {
-          mensagem = 'E-mail já cadastrado';
-        } else if (errorMessage.includes('cpf')) {
-          mensagem = 'CPF já cadastrado';
-        }
-        
-        console.log('❌ Conflito:', mensagem);
         return res.status(409).json({ erro: mensagem });
       }
       
@@ -153,45 +194,88 @@ module.exports = {
     }
   },
 
-  // LOGIN
+  // LOGIN - ROTA: /login
   async logar(req, res) {
     try {
-      console.log('🔐 Tentativa de login...');
-      console.log('📝 Body:', req.body);
+      console.log('\n🔐 ========== TENTATIVA DE LOGIN ==========');
+      console.log('📝 Body recebido:', req.body);
+      console.log('📝 Body completo:', JSON.stringify(req.body, null, 2));
       
       const { identificador, senha } = req.body;
 
+      console.log('\n🆔 ====== ANALISANDO IDENTIFICADOR ======');
+      console.log('🆔 Valor:', identificador);
+      console.log('🆔 Tipo:', typeof identificador);
+      console.log('🆔 Tamanho:', identificador?.length);
+      console.log('🆔 Caracteres (códigos):', identificador?.split('').map(c => c.charCodeAt(0)));
+      console.log('🆔 Caracteres (visuais):', identificador?.split('').map(c => `'${c}'`));
+      console.log('🆔 Contém @?', identificador?.includes('@'));
+      console.log('🆔 ======================================\n');
+
       if (!identificador || !senha) {
-        return res.status(400).json({ 
-          erro: "Identificador e senha são obrigatórios" 
-        });
+        console.log('❌ Identificador ou senha vazios');
+        return res.status(400).json({ erro: "Identificador e senha são obrigatórios" });
       }
 
       let usuario;
+      
       if (identificador.includes('@')) {
-        usuario = await Usuario.findOne({ 
-          where: { email: identificador.trim().toLowerCase() } 
-        });
+        console.log('📧 Identificador é EMAIL');
+        const emailClean = identificador.trim().toLowerCase();
+        console.log('📧 Email limpo:', emailClean);
+        usuario = await Usuario.findOne({ where: { email: emailClean } });
       } else {
+        console.log('🆔 Identificador é CPF');
         const cpfLimpo = limparCPF(identificador);
-        usuario = await Usuario.findOne({ 
-          where: { cpf: cpfLimpo } 
+        console.log('🆔 CPF limpo:', cpfLimpo);
+        console.log('🆔 Tamanho do CPF limpo:', cpfLimpo.length);
+        
+        // Listar todos os usuários
+        console.log('\n📋 ====== USUÁRIOS NO BANCO ======');
+        const todosUsuarios = await Usuario.findAll({
+          attributes: ['id', 'nome_completo', 'email', 'cpf']
         });
+        console.log(`📋 Total: ${todosUsuarios.length} usuários`);
+        todosUsuarios.forEach(u => {
+          console.log(`📋 ID: ${u.id}, Nome: ${u.nome_completo}, CPF: '${u.cpf}' (tamanho: ${u.cpf?.length})`);
+        });
+        console.log('📋 ================================\n');
+        
+        console.log(`🔍 Buscando por CPF: '${cpfLimpo}'`);
+        usuario = await Usuario.findOne({ where: { cpf: cpfLimpo } });
+        
+        if (!usuario) {
+          console.log('❌ Usuário NÃO encontrado com CPF exato');
+          const cpfComMascara = formatarCPF(cpfLimpo);
+          console.log(`🔍 Tentando com CPF formatado: '${cpfComMascara}'`);
+          usuario = await Usuario.findOne({ where: { cpf: cpfComMascara } });
+          
+          if (usuario) {
+            console.log('✅ ENCONTRADO com CPF formatado!');
+          } else {
+            console.log('❌ Também não encontrado com CPF formatado');
+          }
+        }
       }
 
       if (!usuario) {
-        console.log('❌ Usuário não encontrado');
-        return res.status(404).json({ 
-          erro: "Usuário não encontrado" 
-        });
+        console.log('❌ Usuário NÃO encontrado!');
+        return res.status(404).json({ erro: "Usuário não encontrado. Verifique seu CPF/Email" });
       }
 
+      console.log('\n✅ Usuário ENCONTRADO:');
+      console.log('  - ID:', usuario.id);
+      console.log('  - Nome:', usuario.nome_completo);
+      console.log('  - Email:', usuario.email);
+      console.log('  - CPF:', usuario.cpf);
+
+      console.log('\n🔐 Verificando senha...');
       const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+      console.log('🔐 Senha válida?', senhaValida);
+      
       if (!senhaValida) {
         console.log('❌ Senha incorreta');
-        return res.status(401).json({ 
-          erro: "Senha incorreta" 
-        });
+        return res.status(401).json({ erro: "Senha incorreta" });
       }
 
       const token = jwt.sign(
@@ -204,7 +288,9 @@ module.exports = {
         { expiresIn: "7d" }
       );
 
-      console.log('✅ Login realizado com sucesso para:', usuario.email);
+      console.log('\n✅ Login realizado com sucesso!');
+      console.log('✅ Token gerado:', token.substring(0, 30) + '...');
+      console.log('🔐 ========== FIM LOGIN ==========\n');
 
       return res.json({
         sucesso: true,
@@ -221,9 +307,44 @@ module.exports = {
 
     } catch (error) {
       console.error('❌ Erro no login:', error);
+      console.error('❌ Stack:', error.stack);
       return res.status(500).json({ 
-        erro: "Erro interno do servidor" 
+        erro: "Erro interno do servidor",
+        detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
+    }
+  },
+
+  // ===== ROTA DE VERIFICAÇÃO =====
+  async verificarUsuarios(req, res) {
+    try {
+      console.log('\n📋 ====== VERIFICANDO USUÁRIOS ======');
+      const usuarios = await Usuario.findAll({
+        attributes: ['id', 'nome_completo', 'email', 'cpf', 'createdAt']
+      });
+      
+      console.log(`📋 Total: ${usuarios.length} usuários`);
+      const usuariosFormatados = usuarios.map(u => ({
+        id: u.id,
+        nome: u.nome_completo,
+        email: u.email,
+        cpf: u.cpf,
+        cpf_tamanho: u.cpf?.length,
+        criado_em: u.createdAt
+      }));
+      
+      usuariosFormatados.forEach(u => {
+        console.log(`📋 ID: ${u.id}, Nome: ${u.nome}, CPF: '${u.cpf}' (${u.cpf_tamanho} caracteres)`);
+      });
+      console.log('📋 ==================================\n');
+      
+      return res.json({
+        total: usuarios.length,
+        usuarios: usuariosFormatados
+      });
+    } catch (error) {
+      console.error('❌ Erro ao verificar:', error);
+      return res.status(500).json({ erro: error.message });
     }
   },
 
@@ -246,9 +367,7 @@ module.exports = {
       return res.json(usuariosFormatados);
     } catch (error) {
       console.error('❌ Erro ao listar:', error);
-      return res.status(500).json({ 
-        erro: error.message 
-      });
+      return res.status(500).json({ erro: error.message });
     }
   },
 
@@ -260,9 +379,7 @@ module.exports = {
       });
       
       if (!usuario) {
-        return res.status(404).json({ 
-          erro: "Usuário não encontrado" 
-        });
+        return res.status(404).json({ erro: "Usuário não encontrado" });
       }
       
       return res.json({
@@ -274,9 +391,7 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar por ID:', error);
-      return res.status(500).json({ 
-        erro: error.message 
-      });
+      return res.status(500).json({ erro: error.message });
     }
   },
 
@@ -284,42 +399,29 @@ module.exports = {
   async atualizarFoto(req, res) {
     try {
       console.log('📸 Atualizando foto...');
-      console.log('📝 ID do usuário:', req.params.id);
-      console.log('📸 Arquivo:', req.file);
-
       const { id } = req.params;
-
       const usuario = await Usuario.findByPk(id);
 
       if (!usuario) {
         if (req.file && fs.existsSync(req.file.path)) {
           fs.unlinkSync(req.file.path);
         }
-        return res.status(404).json({ 
-          erro: "Usuário não encontrado" 
-        });
+        return res.status(404).json({ erro: "Usuário não encontrado" });
       }
 
       if (!req.file) {
-        return res.status(400).json({ 
-          erro: "Nenhuma imagem foi enviada" 
-        });
+        return res.status(400).json({ erro: "Nenhuma imagem foi enviada" });
       }
 
-      // Deletar foto antiga se existir
       if (usuario.foto) {
         const oldFotoPath = path.join(__dirname, '..', usuario.foto);
         if (fs.existsSync(oldFotoPath)) {
           fs.unlinkSync(oldFotoPath);
-          console.log('🗑️ Foto antiga deletada:', oldFotoPath);
         }
       }
 
-      // Salvar nova foto
       const novaFoto = `/uploads/foto/${req.file.filename}`;
       await usuario.update({ foto: novaFoto });
-
-      console.log('✅ Foto atualizada com sucesso:', novaFoto);
 
       return res.json({
         sucesso: true,
@@ -335,14 +437,10 @@ module.exports = {
 
     } catch (error) {
       console.error('❌ Erro ao atualizar foto:', error);
-      
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      
-      return res.status(500).json({ 
-        erro: "Erro interno do servidor"
-      });
+      return res.status(500).json({ erro: "Erro interno do servidor" });
     }
   },
 
@@ -352,17 +450,13 @@ module.exports = {
       const usuario = await Usuario.findByPk(req.params.id);
       
       if (!usuario) {
-        return res.status(404).json({ 
-          erro: "Usuário não encontrado" 
-        });
+        return res.status(404).json({ erro: "Usuário não encontrado" });
       }
       
-      // Deletar foto do sistema se existir
       if (usuario.foto) {
         const fotoPath = path.join(__dirname, '..', usuario.foto);
         if (fs.existsSync(fotoPath)) {
           fs.unlinkSync(fotoPath);
-          console.log('🗑️ Foto deletada do sistema:', fotoPath);
         }
       }
       
@@ -374,9 +468,7 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao deletar:', error);
-      return res.status(500).json({ 
-        erro: error.message 
-      });
+      return res.status(500).json({ erro: error.message });
     }
   }
 };

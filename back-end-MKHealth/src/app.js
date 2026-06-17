@@ -4,22 +4,28 @@ const path = require('path');
 const fs = require('fs');
 const routes = require("./routes/usuarioRoutes");
 const exameRoutes = require("./routes/exameRoutes");
-const usuarioController = require("./controllers/UsuarioController");
 
 const app = express();
 
-// Configurar limites maiores para upload de PDF
+// Configurar limites maiores para upload
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Log de requisições (para debug)
+// ============================================
+// 🔍 LOG DE TODAS AS REQUISIÇÕES (DEBUG)
+// ============================================
 app.use((req, res, next) => {
-  console.log(`📡 ${req.method} ${req.url}`);
+  console.log(`\n🔍 [${req.method}] ${req.originalUrl}`);
+  console.log('🔍 Params:', req.params);
+  console.log('🔍 Query:', req.query);
+  console.log('🔍 Body:', req.body);
   next();
 });
 
-// Rota de health check
+// ============================================
+// 🏥 ROTA DE HEALTH CHECK
+// ============================================
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -29,7 +35,27 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
-// CORREÇÃO: Servir arquivos estáticos com caminho ABSOLUTO
+// 🧪 ROTA DE TESTE
+// ============================================
+app.get('/teste', (req, res) => {
+  res.json({ 
+    mensagem: '✅ Servidor funcionando!',
+    rotas_disponiveis: {
+      health: 'GET /health',
+      teste: 'GET /teste',
+      cadastro: 'POST /api/usuarios/cadastro',
+      login: 'POST /api/usuarios/login',
+      usuarios: 'GET /api/usuarios',
+      verificar: 'GET /api/usuarios/verificar',
+      'usuario_id': 'GET /api/usuarios/:id',
+      'atualizar_foto': 'PUT /api/usuarios/:id/foto',
+      'deletar': 'DELETE /api/usuarios/:id'
+    }
+  });
+});
+
+// ============================================
+// 📁 SERVIDOR DE ARQUIVOS ESTÁTICOS
 // ============================================
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
@@ -58,7 +84,7 @@ if (!fs.existsSync(examsPath)) {
 app.use('/uploads', express.static(uploadsPath));
 
 // ============================================
-// ROTA DE DEBUG
+// 🐛 ROTAS DE DEBUG
 // ============================================
 app.get('/debug/check-pdf', (req, res) => {
   const examsPathFull = path.join(__dirname, 'uploads', 'exams');
@@ -76,7 +102,6 @@ app.get('/debug/check-pdf', (req, res) => {
   });
 });
 
-// Rota de debug para verificar fotos
 app.get('/debug/check-fotos', (req, res) => {
   const fotosPathFull = path.join(__dirname, 'uploads', 'foto');
   let filesInFotos = [];
@@ -92,23 +117,38 @@ app.get('/debug/check-fotos', (req, res) => {
   });
 });
 
-// Usar as rotas da API
+// ============================================
+// 📡 ROTAS DA API
+// ============================================
 app.use("/api/usuarios", routes);
 app.use("/api/exames", exameRoutes);
 
-// Rota de login (já está nas rotas de usuário, mas mantida para compatibilidade)
-app.post("/logar", usuarioController.logar);
-
-// Middleware 404
+// ============================================
+// ❌ MIDDLEWARE 404 - ROTA NÃO ENCONTRADA
+// ============================================
 app.use((req, res) => {
+  console.log(`❌ Rota não encontrada: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
     erro: 'Rota não encontrada',
     path: req.originalUrl,
-    method: req.method
+    method: req.method,
+    rotas_disponiveis: {
+      health: 'GET /health',
+      teste: 'GET /teste',
+      cadastro: 'POST /api/usuarios/cadastro',
+      login: 'POST /api/usuarios/login',
+      usuarios: 'GET /api/usuarios',
+      verificar: 'GET /api/usuarios/verificar',
+      'usuario_id': 'GET /api/usuarios/:id',
+      'atualizar_foto': 'PUT /api/usuarios/:id/foto',
+      'deletar': 'DELETE /api/usuarios/:id'
+    }
   });
 });
 
-// Middleware de erro
+// ============================================
+// ⚠️ MIDDLEWARE DE ERRO
+// ============================================
 app.use((err, req, res, next) => {
   console.error('❌ Erro:', err.stack);
   res.status(500).json({ 
@@ -117,4 +157,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ============================================
+// ✅ EXPORTA O APP (SEM app.listen)
+// ============================================
 module.exports = app;

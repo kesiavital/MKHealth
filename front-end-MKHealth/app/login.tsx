@@ -1,4 +1,3 @@
-// app/login.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -89,7 +88,8 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const loginUrl = `${USUARIOS_URL}/logar`;
+      // 🔴 ALTERADO: /logar -> /login (CORRIGIDO)
+      const loginUrl = `${USUARIOS_URL}/login`;
       console.log('📡 Conectando ao servidor:', BASE_URL);
       console.log('📡 URL completa:', loginUrl);
       console.log('📡 CPF enviado:', cpfLimpo);
@@ -188,13 +188,11 @@ export default function LoginScreen() {
     console.log('🔵 Router disponível:', !!router);
     
     try {
-      // Tenta diferentes formas de navegação
       router.push('/RegisterScreen' as any);
       console.log('✅ Navegação executada com sucesso!');
     } catch (error) {
       console.error('❌ Erro na navegação:', error);
       
-      // Fallback: tenta outra forma
       try {
         router.push('RegisterScreen' as any);
         console.log('✅ Navegação fallback executada!');
@@ -281,7 +279,7 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
 
-          {/* CADASTRO - CORRIGIDO */}
+          {/* CADASTRO */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Não possui conta?</Text>
             <TouchableOpacity
