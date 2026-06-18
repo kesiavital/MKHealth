@@ -1,18 +1,22 @@
-// service/api.ts
-// Configuração centralizada da API
-
-// IP DO SEU COMPUTADOR - ALTERE AQUI SE O IP MUDAR
-const IP = '192.168.0.12';  // ← SEU IP ATUAL
+//api atual que ta funcionando:
+const LOCAL_IP = '10.26.76.120';  
 const PORTA = '3000';
 
-// URLs base (exporta da mesma forma que suas outras telas esperam)
-export const BASE_URL = `http://${IP}:${PORTA}`;
+// Comentamos as regras antigas temporariamente
+// const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+// const HOST = Platform.OS === 'android' ? EMULATOR_HOST : LOCAL_IP;
+
+// Forçamos o uso do seu IP da ancoragem
+const HOST = LOCAL_IP; 
+
+export const BASE_URL = `http://${HOST}:${PORTA}`;
+// ... resto do seu código
 export const API_URL = `${BASE_URL}/api`;
 export const USUARIOS_URL = `${API_URL}/usuarios`;
 export const EXAMES_URL = `${API_URL}/exames`;
 
-// Exporta o IP no formato que suas telas esperam (para não quebrar)
-export default IP;
+// Exporta o host no formato que suas telas esperam (para não quebrar)
+export default HOST;
 
 // Para manter compatibilidade com telas que usam IP direto
 export const getFullUrl = (path: string) => `${BASE_URL}${path}`;
