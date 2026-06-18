@@ -20,16 +20,26 @@ router.post('/login', usuarioController.logar);
 router.get('/', usuarioController.listar);
 
 // ============================================
+// 🔥 ROTAS DE RECUPERAÇÃO DE SENHA
+// ============================================
+
+// 5. Verificar email (recuperação de senha)
+router.post('/verificar-email', usuarioController.verificarEmail);
+
+// 6. Redefinir senha
+router.post('/redefinir-senha', usuarioController.redefinirSenha);
+
+// ============================================
 // 🟢 ROTAS COM :id - DEPOIS das específicas
 // ============================================
 
-// 5. Buscar por ID
+// 7. Buscar por ID
 router.get('/:id', usuarioController.buscarPorId);
 
-// 6. Atualizar foto
+// 8. Atualizar foto
 router.put('/:id/foto', upload.single('foto'), usuarioController.atualizarFoto);
 
-// 7. Deletar
+// 9. Deletar
 router.delete('/:id', usuarioController.deletar);
 
 module.exports = router;

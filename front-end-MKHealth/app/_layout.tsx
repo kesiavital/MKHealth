@@ -23,6 +23,7 @@ function CustomDrawerContent(props: any) {
   const carregarUsuario = async () => {
     const data = await getUserData();
     setUserData(data);
+    console.log('📱 Dados do usuário no drawer:', data);
   };
 
   const handleLogout = async () => {
@@ -36,7 +37,9 @@ function CustomDrawerContent(props: any) {
             text: 'Sair',
             style: 'destructive',
             onPress: async () => {
-              props.navigation.closeDrawer();
+              if (props.navigation) {
+                props.navigation.closeDrawer();
+              }
               const logoutSuccess = await logout();
               
               if (logoutSuccess) {
@@ -57,10 +60,8 @@ function CustomDrawerContent(props: any) {
     }
   };
 
-  // Não mostra drawer na tela de login e cadastro
-  if (pathname === '/login' || pathname === '/RegisterScreen') return null;
+  if (pathname === '/login' || pathname === '/recuperarSenha') return null;
 
-  // Função para obter a URL completa da foto
   const getFotoUrl = (fotoPath: string | null): string | null => {
     if (!fotoPath) return null;
     if (fotoPath.startsWith('http')) return fotoPath;
@@ -69,83 +70,184 @@ function CustomDrawerContent(props: any) {
 
   const fotoUrl = userData?.foto ? getFotoUrl(userData.foto) : null;
 
-  // Menu items personalizados
-  const menuItems: { label: string; icon: string; route: Href }[] = [
-    { label: 'Home', icon: 'home', route: '/(tabs)' },
-    { label: 'Sobre', icon: 'information', route: '/sobre' },
+  const getTipoUsuarioDescricao = (tipo: number): string => {
+    return tipo === 1 ? 'Médico' : 'Paciente';
+  };
+
+  const getTipoUsuarioIcon = (tipo: number): string => {
+    return tipo === 1 ? 'doctor' : 'account';
+  };
+
+  const getTipoUsuarioColor = (tipo: number): string => {
+    return tipo === 1 ? '#2196F3' : '#4CAF50';
+  };
+
+  const menuItems: { label: string; icon: string; route: Href; iconBg?: string; iconColor?: string }[] = [
+    { label: 'Home', icon: 'home', route: '/(tabs)', iconBg: '#FFF0F0', iconColor: '#8B0000' },
+    { label: 'Sobre', icon: 'information', route: '/sobre', iconBg: '#E3F2FD', iconColor: '#1565C0' },
   ];
+
+  const isAdmin = userData?.tipo_usuario === 1;
+
+  const navigateTo = (route: string) => {
+    if (props.navigation) {
+      props.navigation.closeDrawer();
+    }
+    setTimeout(() => {
+      router.push(route as Href);
+    }, 200);
+  };
+
+  const isActive = (route: string) => {
+    if (route === '/(tabs)' && pathname === '/') return true;
+    if (route === '/(tabs)' && pathname.startsWith('/(tabs)')) return true;
+    if (route === '/admin/RegisterScreen' && pathname === '/admin/RegisterScreen') return true;
+    return pathname === route;
+  };
 
   return (
     <DrawerContentScrollView 
       {...props} 
       contentContainerStyle={styles.drawerContainer}
     >
-      {/* Header com fundo vermelho igual às telas */}
       <View style={styles.drawerHeader}>
-        <View style={styles.avatarContainer}>
-          {fotoUrl ? (
-            <Image 
-              source={{ uri: fotoUrl }} 
-              style={styles.avatarImage}
-              onError={(e) => {
-                console.log('❌ Drawer: Erro ao carregar foto:', e.nativeEvent.error);
-              }}
-            />
-          ) : (
-            <MaterialCommunityIcons name="account" size={50} color="#8B0000" />
-          )}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../assets/images/logomk.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>MKHealth</Text>
         </View>
-        
-        <Text style={styles.userName}>
-          {userData?.nome_completo || userData?.name || 'Usuário'}
-        </Text>
-        
-        <View style={styles.userInfoContainer}>
-          <View style={styles.userInfoRow}>
-            <MaterialCommunityIcons name="account" size={16} color="#FFF" />
-            <Text style={styles.userDetail}>
-              CPF: {userData?.cpf || userData?.document || '---'}
-            </Text>
+
+        <View style={styles.dividerLine} />
+
+        <View style={styles.profileContainer}>
+          <View style={styles.avatarContainer}>
+            {fotoUrl ? (
+              <Image 
+                source={{ uri: fotoUrl }} 
+                style={styles.avatarImage}
+                onError={(e) => {
+                  console.log('❌ Drawer: Erro ao carregar foto:', e.nativeEvent.error);
+                }}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>
+                  {userData?.nome_completo?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              </View>
+            )}
           </View>
-          <View style={styles.userInfoRow}>
-            <MaterialCommunityIcons name="email" size={16} color="#FFF" />
-            <Text style={styles.userDetail} numberOfLines={1}>
-              {userData?.email || ''}
-            </Text>
-          </View>
-        </View>
-      </View>
-      
-      {/* Itens do Menu */}
-      <View style={styles.drawerItems}>
-        {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.route.toString()}
-            style={styles.menuItem}
-            onPress={() => {
-              router.push(item.route);
-              props.navigation.closeDrawer();
-            }}
-          >
-            <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name={item.icon as any} size={24} color="#8B0000" />
+          
+          <Text style={styles.userName} numberOfLines={1}>
+            {userData?.nome_completo || userData?.name || 'Usuário'}
+          </Text>
+          
+          {userData?.tipo_usuario !== undefined && (
+            <View style={[
+              styles.userTypeBadge,
+              { backgroundColor: getTipoUsuarioColor(userData.tipo_usuario) }
+            ]}>
+              <MaterialCommunityIcons 
+                name={getTipoUsuarioIcon(userData.tipo_usuario) as any} 
+                color="#FFFFFF" 
+                size={14} 
+              />
+              <Text style={styles.userTypeText}>
+                {getTipoUsuarioDescricao(userData.tipo_usuario)}
+              </Text>
             </View>
-            <Text style={styles.menuItemLabel}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
+          )}
+          
+          <View style={styles.userInfoContainer}>
+            <View style={styles.userInfoRow}>
+              <MaterialCommunityIcons name="account" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.userDetail} numberOfLines={1}>
+                CPF: {userData?.cpf || userData?.document || '---'}
+              </Text>
+            </View>
+            <View style={styles.userInfoRow}>
+              <MaterialCommunityIcons name="email" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.userDetail} numberOfLines={1}>
+                {userData?.email || ''}
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
       
-      {/* Botão Sair */}
+      <View style={styles.drawerItems}>
+        {menuItems.map((item) => {
+          const active = isActive(item.route.toString());
+          return (
+            <TouchableOpacity
+              key={item.route.toString()}
+              style={[
+                styles.menuItem,
+                active && styles.menuItemActive
+              ]}
+              onPress={() => navigateTo(item.route.toString())}
+            >
+              <View style={[
+                styles.menuIconContainer,
+                { backgroundColor: item.iconBg || '#F8F8F8' },
+                active && styles.menuIconContainerActive
+              ]}>
+                <MaterialCommunityIcons 
+                  name={item.icon as any} 
+                  size={22} 
+                  color={active ? '#FFF' : (item.iconColor || '#8B0000')} 
+                />
+              </View>
+              <Text style={[
+                styles.menuItemLabel,
+                active && styles.menuItemLabelActive
+              ]}>
+                {item.label}
+              </Text>
+              {active && (
+                <View style={styles.activeIndicator} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+
+        {isAdmin && (
+          <>
+            <View style={styles.divider} />
+            
+            <Text style={styles.adminSectionTitle}>🔐 Administração</Text>
+            
+            {/* 🔥 SÓ O GERENCIAR USUÁRIO, REMOVIDO O ADMIN */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateTo('/admin/RegisterScreen')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#E8F5E9' }]}>
+                <MaterialCommunityIcons name="account-plus" size={22} color="#2E7D32" />
+              </View>
+              <Text style={styles.menuItemLabel}>Gerenciar Usuário</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+      
       <View style={styles.logoutButton}>
         <TouchableOpacity
           style={styles.logoutItem}
           onPress={handleLogout}
         >
-          <View style={styles.menuIconContainer}>
-            <MaterialCommunityIcons name="logout" size={24} color="#8B0000" />
+          <View style={[styles.menuIconContainer, { backgroundColor: '#FFEBEE' }]}>
+            <MaterialCommunityIcons name="logout" size={22} color="#D32F2F" />
           </View>
           <Text style={styles.logoutLabel}>Sair</Text>
         </TouchableOpacity>
+        
+        <View style={styles.footerVersion}>
+          <Text style={styles.footerVersionText}>MKHealth v1.0.0</Text>
+        </View>
       </View>
     </DrawerContentScrollView>
   );
@@ -175,7 +277,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     verificarAutenticacao();
-  }, [pathname, verificarAutenticacao]);
+  }, [pathname]);
 
   if (isLoading) {
     return (
@@ -188,7 +290,9 @@ export default function RootLayout() {
     );
   }
 
-  if (!isAuthenticatedState && pathname !== '/login' && pathname !== '/RegisterScreen') {
+  const publicRoutes = ['/login', '/recuperarSenha'];
+
+  if (!isAuthenticatedState && !publicRoutes.includes(pathname)) {
     console.log('🚀 Redirecionando para login...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -197,8 +301,8 @@ export default function RootLayout() {
     );
   }
 
-  if (isAuthenticatedState && pathname === '/login') {
-    console.log('🚀 Usuário já logado, redirecionando para home...');
+  if (isAuthenticatedState && publicRoutes.includes(pathname)) {
+    console.log('🚀 Usuário logado, redirecionando para home...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Redirect href="/(tabs)" />
@@ -206,6 +310,7 @@ export default function RootLayout() {
     );
   }
 
+  // 🔥 LAYOUT ÚNICO PARA TODAS AS ROTAS
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ExamesProvider>
@@ -214,16 +319,24 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             drawerStyle: { 
-              width: '85%',
+              width: '80%',
               backgroundColor: '#FFF',
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 20,
             },
             swipeEnabled: true,
           }}
         >
+          {/* ROTAS PRINCIPAIS */}
           <Drawer.Screen name="(tabs)" options={{ title: 'Home' }} />
           <Drawer.Screen name="sobre" options={{ title: 'Sobre' }} />
+          
+          {/* ROTAS ADMIN (VISÍVEIS NO DRAWER, MAS COM PROTEÇÃO NA TELA) */}
+          <Drawer.Screen name="admin/RegisterScreen" options={{ title: 'Gerenciar Usuário' }} />
+          
+          {/* ROTAS OCULTAS */}
           <Drawer.Screen name="login" options={{ drawerItemStyle: { display: 'none' } }} />
-          <Drawer.Screen name="RegisterScreen" options={{ drawerItemStyle: { display: 'none' } }} />
+          <Drawer.Screen name="recuperarSenha" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="index" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="admin" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="modal" options={{ drawerItemStyle: { display: 'none' } }} />
@@ -239,120 +352,218 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
   },
-  // HEADER VERMELHO IGUAL ÀS TELAS
+  
   drawerHeader: {
     backgroundColor: '#8B0000',
-    paddingVertical: 30,
+    paddingVertical: 20,
     paddingHorizontal: 20,
-    alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    marginBottom: 15,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  logoImage: {
+    width: 45,
+    height: 45,
+    tintColor: '#FFF',
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginLeft: 10,
+    letterSpacing: 1,
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 15,
+  },
+  
+  profileContainer: {
+    alignItems: 'center',
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: '#FFF',
-    marginBottom: 10,
+    borderColor: '#FFD700',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     resizeMode: 'cover',
   },
+  avatarFallback: {
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
+    backgroundColor: '#FFD700',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 34,
+    fontWeight: 'bold',
+    color: '#8B0000',
+  },
   userName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#FFF',
     textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 4,
+    maxWidth: '90%',
+  },
+  userTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+    gap: 5,
+  },
+  userTypeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   userInfoContainer: {
     width: '100%',
-    marginTop: 5,
+    marginTop: 2,
   },
   userInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 3,
+    marginTop: 2,
   },
   userDetail: {
-    fontSize: 13,
-    color: '#FFF',
-    marginLeft: 6,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginLeft: 5,
     textAlign: 'center',
-    opacity: 0.9,
   },
-  // ITENS DO MENU
+  
   drawerItems: { 
     flex: 1,
     paddingTop: 5,
+    paddingHorizontal: 15,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginHorizontal: 15,
-    marginVertical: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginVertical: 3,
     borderRadius: 12,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  menuItemActive: {
+    backgroundColor: '#FFF5F5',
   },
   menuIconContainer: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 10,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F8F8F8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginRight: 14,
+  },
+  menuIconContainerActive: {
+    backgroundColor: '#8B0000',
   },
   menuItemLabel: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#444',
     fontWeight: '500',
+    flex: 1,
   },
-  // BOTÃO SAIR
+  menuItemLabelActive: {
+    color: '#8B0000',
+    fontWeight: 'bold',
+  },
+  activeIndicator: {
+    width: 4,
+    height: 24,
+    backgroundColor: '#8B0000',
+    borderRadius: 2,
+    position: 'absolute',
+    right: 0,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E8E8E8',
+    marginVertical: 12,
+    marginHorizontal: 10,
+  },
+  adminSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginLeft: 15,
+    marginBottom: 8,
+  },
+  
   logoutButton: {
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 5,
+    paddingTop: 12,
     paddingHorizontal: 15,
-    marginBottom: 20,
+    paddingBottom: 10,
   },
   logoutItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderRadius: 12,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFF5F5',
   },
   logoutLabel: {
-    fontSize: 16,
-    marginLeft: 15,
-    color: '#8B0000',
-    fontWeight: 'bold',
+    fontSize: 15,
+    marginLeft: 14,
+    color: '#D32F2F',
+    fontWeight: '600',
   },
+  footerVersion: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  footerVersionText: {
+    fontSize: 11,
+    color: '#BBB',
+    letterSpacing: 0.5,
+  },
+  
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

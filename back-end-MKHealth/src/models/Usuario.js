@@ -32,10 +32,15 @@ const Usuario = sequelize.define(
       allowNull: true,
       defaultValue: null,
     },
+    tipo_usuario: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   },
   {
     tableName: "usuarios",
-    timestamps: false,
+    timestamps: false, // MANTENHA COMO FALSE
   }
 );
 

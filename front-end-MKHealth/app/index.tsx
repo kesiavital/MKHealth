@@ -47,7 +47,7 @@ export default function Index() {
       <StatusBar style="light" />
       <View style={styles.content}>
         <Image
-          source={require('./img/logomk.png')}
+          source={require('../assets/images/logomk.png')}
           style={styles.logo}
         />
         <Text style={styles.title}>MK Health</Text>
