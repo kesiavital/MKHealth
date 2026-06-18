@@ -1,13 +1,15 @@
 // app/recuperarSenha.tsx
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,61 +22,95 @@ import { USUARIOS_URL } from '../service/api';
 export default function RecuperarSenhaScreen() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const [identificador, setIdentificador] = useState('');
+  const [email, setEmail] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [showNovaSenha, setShowNovaSenha] = useState(false);
   const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
   const [codigo, setCodigo] = useState('');
-  const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [codigoGerado, setCodigoGerado] = useState('');
-
-  const formatCPF = (value: string) => {
-    const cpfClean = value.replace(/\D/g, '');
-    if (cpfClean.length <= 3) return cpfClean;
-    if (cpfClean.length <= 6) return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3)}`;
-    if (cpfClean.length <= 9) return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3, 6)}.${cpfClean.slice(6)}`;
-    return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3, 6)}.${cpfClean.slice(6, 9)}-${cpfClean.slice(9, 11)}`;
-  };
-
-  const limparCPF = (cpf: string) => cpf.replace(/\D/g, '');
+  const [usuarioId, setUsuarioId] = useState<number | null>(null);
+  
+  const [modalVisible, setModalVisible] = useState(false);
+  const [codigoModal, setCodigoModal] = useState('');
+  const [modalTipo, setModalTipo] = useState<'sucesso' | 'erro' | 'info' | 'confirmacao'>('info');
+  const [modalTitulo, setModalTitulo] = useState('');
+  const [modalMensagem, setModalMensagem] = useState('');
+  const [modalBotaoTexto, setModalBotaoTexto] = useState('OK');
+  const [modalAcao, setModalAcao] = useState<(() => void) | null>(null);
+  const [modalBotaoSecundario, setModalBotaoSecundario] = useState<{ texto: string; acao: () => void } | null>(null);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
-  const isCPF = (value: string) => {
-    const clean = value.replace(/\D/g, '');
-    return clean.length === 11;
+  const gerarCodigo = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  const isEmail = (value: string) => {
-    return validateEmail(value);
+  const abrirModal = (
+    tipo: 'sucesso' | 'erro' | 'info' | 'confirmacao',
+    titulo: string,
+    mensagem: string,
+    botaoTexto: string = 'OK',
+    acao?: () => void,
+    botaoSecundario?: { texto: string; acao: () => void }
+  ) => {
+    setModalTipo(tipo);
+    setModalTitulo(titulo);
+    setModalMensagem(mensagem);
+    setModalBotaoTexto(botaoTexto);
+    setModalAcao(() => acao || null);
+    setModalBotaoSecundario(botaoSecundario || null);
+    setModalVisible(true);
   };
 
-  const handleVerificarIdentificador = async () => {
-    if (!identificador.trim()) {
-      Alert.alert('Erro', 'Digite seu CPF ou E-mail');
+  const fecharModal = () => {
+    setModalVisible(false);
+    if (modalAcao) {
+      modalAcao();
+    }
+  };
+
+  const abrirModalCodigo = (codigo: string) => {
+    setCodigoModal(codigo);
+    setModalTipo('info');
+    setModalTitulo('📧 Código Enviado!');
+    setModalMensagem('');
+    setModalBotaoTexto('ENTENDI, IR PARA O PASSO 2');
+    setModalAcao(() => () => {
+      setStep(2);
+    });
+    setModalBotaoSecundario(null);
+    setModalVisible(true);
+  };
+
+  const handleVerificarEmail = async () => {
+    if (!email.trim()) {
+      abrirModal(
+        'erro',
+        '⚠️ Campo Vazio',
+        'Por favor, digite seu e-mail para continuar.'
+      );
       return;
     }
 
-    const cpfLimpo = limparCPF(identificador);
-    const emailLimpo = identificador.trim().toLowerCase();
-
-    if (!isCPF(cpfLimpo) && !isEmail(emailLimpo)) {
-      Alert.alert('Erro', 'Digite um CPF ou E-mail válido');
+    if (!validateEmail(email.trim())) {
+      abrirModal(
+        'erro',
+        '📧 E-mail Inválido',
+        'Por favor, digite um endereço de e-mail válido.\n\nExemplo: usuario@email.com'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const url = `${USUARIOS_URL}/recuperar-senha`;
+      const url = `${USUARIOS_URL}/verificar-email`;
       
-      console.log('📡 Verificando usuário:', {
-        identificador: cpfLimpo || emailLimpo
-      });
+      console.log('📡 Verificando email:', email.trim());
 
       const response = await fetch(url, {
         method: 'POST',
@@ -83,7 +119,7 @@ export default function RecuperarSenhaScreen() {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          identificador: cpfLimpo || emailLimpo
+          email: email.trim().toLowerCase()
         }),
       });
 
@@ -91,37 +127,45 @@ export default function RecuperarSenhaScreen() {
       console.log('📡 Resposta:', data);
 
       if (response.status === 404) {
-        Alert.alert('Erro', 'Usuário não encontrado. Verifique seu CPF ou E-mail.');
+        abrirModal(
+          'erro',
+          '🔍 E-mail não encontrado',
+          'Este e-mail não está cadastrado em nossa base de dados.\n\nVerifique o e-mail informado e tente novamente.',
+          'Tentar Novamente',
+          undefined,
+          {
+            texto: 'Voltar ao Login',
+            acao: () => router.replace('/login')
+          }
+        );
+        setLoading(false);
         return;
       }
 
       if (!response.ok) {
-        Alert.alert('Erro', data.erro || 'Erro ao verificar usuário');
+        abrirModal(
+          'erro',
+          '❌ Erro na Verificação',
+          data.erro || 'Ocorreu um erro ao verificar seu e-mail. Tente novamente.'
+        );
+        setLoading(false);
         return;
       }
 
       if (data.usuario) {
-        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        setUsuarioId(data.usuario.id);
+        const codigo = gerarCodigo();
         setCodigoGerado(codigo);
-        setCodigoEnviado(true);
-        
-        Alert.alert(
-          '✅ Código Enviado!',
-          `Um código de verificação foi enviado para seu e-mail.\n\nCódigo: ${codigo}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setStep(2);
-              }
-            }
-          ]
-        );
+        abrirModalCodigo(codigo);
       }
 
     } catch (error: any) {
       console.error('❌ Erro:', error);
-      Alert.alert('Erro', error.message || 'Erro ao verificar usuário');
+      abrirModal(
+        'erro',
+        '❌ Erro de Conexão',
+        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.'
+      );
     } finally {
       setLoading(false);
     }
@@ -129,27 +173,48 @@ export default function RecuperarSenhaScreen() {
 
   const handleRedefinirSenha = async () => {
     if (!codigo.trim()) {
-      Alert.alert('Erro', 'Digite o código de verificação');
+      abrirModal(
+        'erro',
+        '🔑 Código Obrigatório',
+        'Por favor, digite o código de verificação recebido no seu e-mail.'
+      );
       return;
     }
 
     if (!novaSenha.trim()) {
-      Alert.alert('Erro', 'Digite a nova senha');
+      abrirModal(
+        'erro',
+        '🔒 Senha Obrigatória',
+        'Por favor, digite sua nova senha.'
+      );
       return;
     }
 
     if (novaSenha.length < 4) {
-      Alert.alert('Erro', 'A senha deve ter pelo menos 4 caracteres');
+      abrirModal(
+        'erro',
+        '🔒 Senha Fraca',
+        'A senha deve ter pelo menos 4 caracteres.\n\nEscolha uma senha mais segura.'
+      );
       return;
     }
 
     if (novaSenha !== confirmarSenha) {
-      Alert.alert('Erro', 'As senhas não coincidem');
+      abrirModal(
+        'erro',
+        '❌ Senhas não coincidem',
+        'As senhas digitadas não são iguais.\n\nPor favor, digite a mesma senha nos dois campos.'
+      );
       return;
     }
 
-    if (codigo !== codigoGerado && codigo !== '123456') {
-      Alert.alert('Erro', 'Código inválido. Tente novamente.');
+    if (codigo !== codigoGerado) {
+      abrirModal(
+        'erro',
+        '❌ Código Inválido',
+        'O código de verificação digitado está incorreto.\n\nVerifique o código enviado para seu e-mail e tente novamente.',
+        'Verificar Novamente'
+      );
       return;
     }
 
@@ -158,6 +223,8 @@ export default function RecuperarSenhaScreen() {
     try {
       const url = `${USUARIOS_URL}/redefinir-senha`;
       
+      console.log('📡 Redefinindo senha para:', email.trim());
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -165,37 +232,48 @@ export default function RecuperarSenhaScreen() {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          identificador: limparCPF(identificador) || identificador.trim().toLowerCase(),
+          email: email.trim().toLowerCase(),
           nova_senha: novaSenha,
           codigo: codigo
         }),
       });
 
       const data = await response.json();
+      console.log('📡 Resposta:', data);
 
       if (!response.ok) {
-        Alert.alert('Erro', data.erro || 'Erro ao redefinir senha');
+        abrirModal(
+          'erro',
+          '❌ Erro ao Redefinir',
+          data.erro || 'Ocorreu um erro ao redefinir sua senha. Tente novamente.'
+        );
+        setLoading(false);
         return;
       }
 
-      Alert.alert(
-        '✅ Sucesso!',
-        'Sua senha foi redefinida com sucesso!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              router.replace('/login');
-            }
-          }
-        ]
+      abrirModal(
+        'sucesso',
+        '✅ Senha Redefinida!',
+        'Sua senha foi redefinida com sucesso!\n\nAgora você pode fazer login com sua nova senha.',
+        'Ir para Login',
+        () => router.replace('/login')
       );
 
     } catch (error: any) {
       console.error('❌ Erro:', error);
-      Alert.alert('Erro', error.message || 'Erro ao redefinir senha');
+      abrirModal(
+        'erro',
+        '❌ Erro de Conexão',
+        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão e tente novamente.'
+      );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const verCodigoNovamente = () => {
+    if (codigoGerado) {
+      abrirModalCodigo(codigoGerado);
     }
   };
 
@@ -206,8 +284,39 @@ export default function RecuperarSenhaScreen() {
   const voltarStep1 = () => {
     setStep(1);
     setCodigo('');
-    setCodigoEnviado(false);
     setCodigoGerado('');
+    setUsuarioId(null);
+  };
+
+  const renderModalIcon = () => {
+    switch (modalTipo) {
+      case 'sucesso':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconSuccess]}>
+            <Ionicons name="checkmark-circle" size={50} color="#4CAF50" />
+          </View>
+        );
+      case 'erro':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconError]}>
+            <Ionicons name="alert-circle" size={50} color="#F44336" />
+          </View>
+        );
+      case 'info':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconInfo]}>
+            <Ionicons name="information-circle" size={50} color="#2196F3" />
+          </View>
+        );
+      case 'confirmacao':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconConfirm]}>
+            <Ionicons name="help-circle" size={50} color="#FF9800" />
+          </View>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -216,14 +325,13 @@ export default function RecuperarSenhaScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar style="light" />
-      <View style={styles.backgroundCircle} />
       
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoContainer}>
+        <View style={styles.header}>
           <Image
             source={require('../assets/images/logomk.png')}
             style={styles.logo}
@@ -238,41 +346,39 @@ export default function RecuperarSenhaScreen() {
           </Text>
           <Text style={styles.subtitle}>
             {step === 1 
-              ? 'Digite seu CPF ou E-mail para receber o código de verificação' 
+              ? 'Digite seu e-mail cadastrado para receber o código de verificação' 
               : 'Digite o código recebido e sua nova senha'
             }
           </Text>
 
-          {/* STEP 1: Verificar Identificador */}
           {step === 1 && (
             <>
-              <Text style={styles.label}>CPF ou E-mail</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="000.000.000-00 ou email@exemplo.com"
-                placeholderTextColor="#999"
-                value={identificador}
-                onChangeText={(text) => {
-                  if (text.replace(/\D/g, '').length <= 11 && !text.includes('@')) {
-                    setIdentificador(formatCPF(text));
-                  } else {
-                    setIdentificador(text);
-                  }
-                }}
-                autoCapitalize="none"
-                keyboardType={identificador.includes('@') ? 'email-address' : 'default'}
-                editable={!loading}
-              />
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>E-mail Cadastrado</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="seuemail@exemplo.com"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!loading}
+                />
+                <Text style={styles.helperText}>
+                  Digite o e-mail utilizado no cadastro
+                </Text>
+              </View>
 
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleVerificarIdentificador}
+                onPress={handleVerificarEmail}
                 disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
-                  <Text style={styles.buttonText}>ENVIAR CÓDIGO</Text>
+                  <Text style={styles.buttonText}>VERIFICAR E-MAIL</Text>
                 )}
               </TouchableOpacity>
 
@@ -286,76 +392,89 @@ export default function RecuperarSenhaScreen() {
             </>
           )}
 
-          {/* STEP 2: Nova Senha */}
           {step === 2 && (
             <>
               <View style={styles.stepIndicator}>
                 <Text style={styles.stepIndicatorText}>Passo 2 de 2</Text>
               </View>
 
-              <Text style={styles.label}>Código de Verificação</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Digite o código recebido"
-                placeholderTextColor="#999"
-                value={codigo}
-                onChangeText={setCodigo}
-                keyboardType="numeric"
-                maxLength={6}
-                editable={!loading}
-              />
-
-              <Text style={styles.label}>Nova Senha</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Digite a nova senha"
-                  placeholderTextColor="#999"
-                  value={novaSenha}
-                  onChangeText={setNovaSenha}
-                  secureTextEntry={!showNovaSenha}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowNovaSenha(!showNovaSenha)}
-                  disabled={loading}
-                >
-                  <Text style={styles.eyeIcon}>
-                    {showNovaSenha ? '👁️' : '👁️‍🗨️'}
-                  </Text>
-                </TouchableOpacity>
+              <View style={styles.emailInfo}>
+                <Text style={styles.emailInfoText}>📧 E-mail verificado: {email}</Text>
               </View>
 
-              <Text style={styles.label}>Confirmar Nova Senha</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Confirme a nova senha"
-                  placeholderTextColor="#999"
-                  value={confirmarSenha}
-                  onChangeText={setConfirmarSenha}
-                  secureTextEntry={!showConfirmarSenha}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowConfirmarSenha(!showConfirmarSenha)}
-                  disabled={loading}
-                >
-                  <Text style={styles.eyeIcon}>
-                    {showConfirmarSenha ? '👁️' : '👁️‍🗨️'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {codigoEnviado && (
-                <View style={styles.codigoTeste}>
-                  <Text style={styles.codigoTesteLabel}>📱 Código de teste:</Text>
-                  <Text style={styles.codigoTesteValor}>{codigoGerado}</Text>
-                  <Text style={styles.codigoTesteObs}>(Ou use: 123456)</Text>
+              <View style={styles.inputContainer}>
+                <View style={styles.codigoHeader}>
+                  <Text style={styles.label}>Código de Verificação</Text>
+                  <TouchableOpacity 
+                    style={styles.verCodigoButton}
+                    onPress={verCodigoNovamente}
+                  >
+                    <Ionicons name="eye-outline" size={20} color="#8B0000" />
+                    <Text style={styles.verCodigoText}>Ver Código</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite o código de 6 dígitos"
+                  placeholderTextColor="#999"
+                  value={codigo}
+                  onChangeText={setCodigo}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  editable={!loading}
+                />
+                <Text style={styles.helperText}>
+                  Código gerado: {codigoGerado}
+                </Text>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Nova Senha</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Digite a nova senha (mín. 4 caracteres)"
+                    placeholderTextColor="#999"
+                    value={novaSenha}
+                    onChangeText={setNovaSenha}
+                    secureTextEntry={!showNovaSenha}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowNovaSenha(!showNovaSenha)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.eyeIcon}>
+                      {showNovaSenha ? '👁️' : '👁️‍🗨️'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirmar Nova Senha</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Confirme a nova senha"
+                    placeholderTextColor="#999"
+                    value={confirmarSenha}
+                    onChangeText={setConfirmarSenha}
+                    secureTextEntry={!showConfirmarSenha}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowConfirmarSenha(!showConfirmarSenha)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.eyeIcon}>
+                      {showConfirmarSenha ? '👁️' : '👁️‍🗨️'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -380,6 +499,90 @@ export default function RecuperarSenhaScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* MODAL UNIVERSAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={fecharModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={fecharModal}>
+          <View style={styles.modalContainer}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalIconContainer}>
+                {renderModalIcon()}
+              </View>
+
+              <Text style={[
+                styles.modalTitle,
+                modalTipo === 'sucesso' && styles.modalTitleSuccess,
+                modalTipo === 'erro' && styles.modalTitleError,
+                modalTipo === 'info' && styles.modalTitleInfo,
+                modalTipo === 'confirmacao' && styles.modalTitleConfirm,
+              ]}>
+                {modalTitulo}
+              </Text>
+
+              {/* 🔥 SÓ MOSTRA A MENSAGEM SE NÃO FOR O MODAL DE CÓDIGO */}
+              {modalMensagem !== '' && (
+                <Text style={[
+                  styles.modalMensagem,
+                  modalTipo === 'sucesso' && styles.modalMensagemSuccess,
+                  modalTipo === 'erro' && styles.modalMensagemError,
+                ]}>
+                  {modalMensagem}
+                </Text>
+              )}
+
+              {/* 🔥 MODAL DE CÓDIGO - MOSTRA SÓ O EMAIL E O CÓDIGO */}
+              {modalTipo === 'info' && modalTitulo === '📧 Código Enviado!' && (
+                <>
+                  <View style={styles.modalEmailContainer}>
+                    <Ionicons name="mail" size={16} color="#666" />
+                    <Text style={styles.modalEmail}>{email}</Text>
+                  </View>
+
+                  <View style={styles.modalCodigoContainer}>
+                    <Text style={styles.modalCodigoLabel}>Seu código de verificação</Text>
+                    <Text style={styles.modalCodigo}>{codigoModal}</Text>
+                  </View>
+                </>
+              )}
+
+              <View style={styles.modalBotoesContainer}>
+                {modalBotaoSecundario && (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSecundario]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      modalBotaoSecundario?.acao();
+                    }}
+                  >
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextSecundario]}>
+                      {modalBotaoSecundario.texto}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    modalTipo === 'sucesso' && styles.modalButtonSuccess,
+                    modalTipo === 'erro' && styles.modalButtonError,
+                    modalTipo === 'info' && styles.modalButtonInfo,
+                    modalTipo === 'confirmacao' && styles.modalButtonConfirm,
+                    modalBotaoSecundario && styles.modalButtonPrincipal,
+                  ]}
+                  onPress={fecharModal}
+                >
+                  <Text style={styles.modalButtonText}>{modalBotaoTexto}</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -389,16 +592,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#8B0000',
   },
-  backgroundCircle: {
-    position: 'absolute',
-    top: -100,
-    left: -50,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: '#A52A2A',
-    opacity: 0.5,
-  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -406,7 +599,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 40,
   },
-  logoContainer: {
+  header: {
     alignItems: 'center',
     marginBottom: 30,
   },
@@ -466,56 +659,83 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
+  inputContainer: {
+    marginBottom: 18,
+  },
+  codigoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   label: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#555',
-    marginBottom: 5,
     marginLeft: 5,
   },
+  verCodigoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  verCodigoText: {
+    fontSize: 13,
+    color: '#8B0000',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
     padding: 15,
-    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E8E8E8',
     fontSize: 16,
+    color: '#333',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 5,
+    marginLeft: 5,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginBottom: 20,
+    borderColor: '#E8E8E8',
   },
   passwordInput: {
     flex: 1,
     padding: 15,
     fontSize: 16,
+    color: '#333',
   },
   eyeButton: {
     paddingHorizontal: 15,
   },
   eyeIcon: {
     fontSize: 20,
+    opacity: 0.6,
   },
   button: {
     backgroundColor: '#8B0000',
     padding: 18,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
     shadowColor: '#8B0000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   buttonDisabled: {
     backgroundColor: '#CC6666',
@@ -525,6 +745,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+    letterSpacing: 1,
   },
   linkButton: {
     alignItems: 'center',
@@ -536,29 +757,199 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  codigoTeste: {
-    backgroundColor: '#FFF3E0',
-    padding: 15,
+  emailInfo: {
+    backgroundColor: '#E8F5E9',
+    padding: 12,
     borderRadius: 10,
     marginBottom: 20,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FFB74D',
+    borderColor: '#A5D6A7',
   },
-  codigoTesteLabel: {
+  emailInfoText: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  // ESTILOS DO MODAL
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 30,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    marginBottom: 16,
+  },
+  modalIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+  },
+  modalIconSuccess: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+  },
+  modalIconError: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#F44336',
+  },
+  modalIconInfo: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+  },
+  modalIconConfirm: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF9800',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalTitleSuccess: {
+    color: '#2E7D32',
+  },
+  modalTitleError: {
+    color: '#C62828',
+  },
+  modalTitleInfo: {
+    color: '#0D47A1',
+  },
+  modalTitleConfirm: {
+    color: '#E65100',
+  },
+  modalMensagem: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
   },
-  codigoTesteValor: {
-    fontSize: 28,
+  modalMensagemSuccess: {
+    color: '#1B5E20',
+  },
+  modalMensagemError: {
+    color: '#B71C1C',
+  },
+  modalEmailContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  modalEmail: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  modalCodigoContainer: {
+    backgroundColor: '#FFF8E1',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FFB74D',
+    width: '100%',
+  },
+  modalCodigoLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  modalCodigo: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#E65100',
-    letterSpacing: 4,
+    letterSpacing: 8,
   },
-  codigoTesteObs: {
-    fontSize: 12,
-    color: '#999',
+  modalInstrucao: {
+    fontSize: 13,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
+  },
+  modalBotoesContainer: {
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modalButtonSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonError: {
+    backgroundColor: '#F44336',
+  },
+  modalButtonInfo: {
+    backgroundColor: '#2196F3',
+  },
+  modalButtonConfirm: {
+    backgroundColor: '#FF9800',
+  },
+  modalButtonPrincipal: {
     marginTop: 5,
+  },
+  modalButtonSecundario: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  modalButtonTextSecundario: {
+    color: '#666',
   },
 });

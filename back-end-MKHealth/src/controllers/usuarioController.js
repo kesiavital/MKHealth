@@ -9,29 +9,29 @@ function validarCPF(cpf) {
   console.log('🔍 [VALIDAR CPF] Tipo do CPF:', typeof cpf);
   console.log('🔍 [VALIDAR CPF] Comprimento:', cpf?.length);
   console.log('🔍 [VALIDAR CPF] Caracteres:', cpf?.split('').map(c => ({ char: c, code: c.charCodeAt(0) })));
-  
+
   if (!cpf) {
     console.log('❌ [VALIDAR CPF] CPF é null ou undefined');
     return false;
   }
-  
+
   const cpfClean = cpf.replace(/[^\d]/g, '');
   console.log('🔍 [VALIDAR CPF] CPF limpo:', cpfClean);
   console.log('🔍 [VALIDAR CPF] Tamanho do CPF limpo:', cpfClean.length);
-  
+
   if (cpfClean.length !== 11) {
     console.log('❌ [VALIDAR CPF] Tamanho inválido - esperado 11, recebido:', cpfClean.length);
     return false;
   }
-  
+
   if (/^(\d)\1{10}$/.test(cpfClean)) {
     console.log('❌ [VALIDAR CPF] CPF com todos dígitos iguais');
     return false;
   }
-  
+
   let soma = 0;
   let resto;
-  
+
   for (let i = 0; i < 9; i++) {
     soma += parseInt(cpfClean.charAt(i)) * (10 - i);
   }
@@ -41,7 +41,7 @@ function validarCPF(cpf) {
     console.log('❌ [VALIDAR CPF] Primeiro dígito verificador inválido');
     return false;
   }
-  
+
   soma = 0;
   for (let i = 0; i < 10; i++) {
     soma += parseInt(cpfClean.charAt(i)) * (11 - i);
@@ -52,7 +52,7 @@ function validarCPF(cpf) {
     console.log('❌ [VALIDAR CPF] Segundo dígito verificador inválido');
     return false;
   }
-  
+
   console.log('✅ [VALIDAR CPF] CPF válido!');
   return true;
 }
@@ -81,7 +81,7 @@ module.exports = {
       console.log('📝 Body recebido:', req.body);
       console.log('📝 Body keys:', Object.keys(req.body));
       console.log('📝 File recebido:', req.file ? 'SIM - ' + req.file.filename : 'NÃO');
-      
+
       const { nome_completo, email, cpf, senha, tipo_usuario } = req.body;
 
       console.log('\n🆔 ====== CPF RECEBIDO ======');
@@ -110,7 +110,7 @@ module.exports = {
       const cpfValido = validarCPF(cpf);
       console.log('🔐 Resultado:', cpfValido);
       console.log('🔐 ============================\n');
-      
+
       if (!cpfValido) {
         console.log('❌ CPF inválido!');
         if (req.file) {
@@ -121,7 +121,7 @@ module.exports = {
 
       const cpfLimpo = limparCPF(cpf);
       console.log('✅ CPF limpo final:', cpfLimpo);
-      
+
       const senhaHash = await bcrypt.hash(senha, 10);
       console.log('✅ Senha hasheada');
 
@@ -192,11 +192,11 @@ module.exports = {
     } catch (error) {
       console.error('❌ Erro no cadastro:', error);
       console.error('❌ Stack:', error.stack);
-      
+
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      
+
       if (error.name === 'SequelizeUniqueConstraintError') {
         let mensagem = 'Email ou CPF já cadastrado';
         if (error.fields) {
@@ -205,13 +205,13 @@ module.exports = {
         }
         return res.status(409).json({ erro: mensagem });
       }
-      
+
       if (error.name === 'SequelizeValidationError') {
         const mensagens = error.errors.map(err => err.message).join(', ');
         return res.status(400).json({ erro: mensagens });
       }
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         erro: "Erro interno do servidor",
         detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -224,7 +224,7 @@ module.exports = {
       console.log('\n🔐 ========== TENTATIVA DE LOGIN ==========');
       console.log('📝 Body recebido:', req.body);
       console.log('📝 Body completo:', JSON.stringify(req.body, null, 2));
-      
+
       const { identificador, senha } = req.body;
 
       console.log('\n🆔 ====== ANALISANDO IDENTIFICADOR ======');
@@ -242,7 +242,7 @@ module.exports = {
       }
 
       let usuario;
-      
+
       if (identificador.includes('@')) {
         console.log('📧 Identificador é EMAIL');
         const emailClean = identificador.trim().toLowerCase();
@@ -253,7 +253,7 @@ module.exports = {
         const cpfLimpo = limparCPF(identificador);
         console.log('🆔 CPF limpo:', cpfLimpo);
         console.log('🆔 Tamanho do CPF limpo:', cpfLimpo.length);
-        
+
         console.log('\n📋 ====== USUÁRIOS NO BANCO ======');
         const todosUsuarios = await Usuario.findAll({
           attributes: ['id', 'nome_completo', 'email', 'cpf', 'tipo_usuario']
@@ -263,16 +263,16 @@ module.exports = {
           console.log(`📋 ID: ${u.id}, Nome: ${u.nome_completo}, CPF: '${u.cpf}' (tamanho: ${u.cpf?.length}), Tipo: ${u.tipo_usuario}`);
         });
         console.log('📋 ================================\n');
-        
+
         console.log(`🔍 Buscando por CPF: '${cpfLimpo}'`);
         usuario = await Usuario.findOne({ where: { cpf: cpfLimpo } });
-        
+
         if (!usuario) {
           console.log('❌ Usuário NÃO encontrado com CPF exato');
           const cpfComMascara = formatarCPF(cpfLimpo);
           console.log(`🔍 Tentando com CPF formatado: '${cpfComMascara}'`);
           usuario = await Usuario.findOne({ where: { cpf: cpfComMascara } });
-          
+
           if (usuario) {
             console.log('✅ ENCONTRADO com CPF formatado!');
           } else {
@@ -296,15 +296,15 @@ module.exports = {
       console.log('\n🔐 Verificando senha...');
       const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
       console.log('🔐 Senha válida?', senhaValida);
-      
+
       if (!senhaValida) {
         console.log('❌ Senha incorreta');
         return res.status(401).json({ erro: "Senha incorreta" });
       }
 
       const token = jwt.sign(
-        { 
-          id: usuario.id, 
+        {
+          id: usuario.id,
           email: usuario.email,
           nome_completo: usuario.nome_completo,
           tipo_usuario: usuario.tipo_usuario
@@ -334,7 +334,7 @@ module.exports = {
     } catch (error) {
       console.error('❌ Erro no login:', error);
       console.error('❌ Stack:', error.stack);
-      return res.status(500).json({ 
+      return res.status(500).json({
         erro: "Erro interno do servidor",
         detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -348,7 +348,7 @@ module.exports = {
       const usuarios = await Usuario.findAll({
         attributes: ['id', 'nome_completo', 'email', 'cpf', 'tipo_usuario', 'createdAt']
       });
-      
+
       console.log(`📋 Total: ${usuarios.length} usuários`);
       const usuariosFormatados = usuarios.map(u => ({
         id: u.id,
@@ -360,12 +360,12 @@ module.exports = {
         tipo_descricao: u.tipo_usuario === 0 ? 'Paciente' : 'Médico',
         criado_em: u.createdAt
       }));
-      
+
       usuariosFormatados.forEach(u => {
         console.log(`📋 ID: ${u.id}, Nome: ${u.nome}, CPF: '${u.cpf}' (${u.cpf_tamanho} caracteres), Tipo: ${u.tipo_descricao}`);
       });
       console.log('📋 ==================================\n');
-      
+
       return res.json({
         total: usuarios.length,
         usuarios: usuariosFormatados
@@ -383,7 +383,7 @@ module.exports = {
         attributes: { exclude: ["senha_hash"] },
         order: [['id', 'ASC']]
       });
-      
+
       const usuariosFormatados = usuarios.map(u => ({
         id: u.id,
         nome_completo: u.nome_completo,
@@ -393,7 +393,7 @@ module.exports = {
         tipo_usuario: u.tipo_usuario,
         tipo_descricao: u.tipo_usuario === 0 ? 'Paciente' : 'Médico'
       }));
-      
+
       return res.json(usuariosFormatados);
     } catch (error) {
       console.error('❌ Erro ao listar:', error);
@@ -407,11 +407,11 @@ module.exports = {
       const usuario = await Usuario.findByPk(req.params.id, {
         attributes: { exclude: ["senha_hash"] }
       });
-      
+
       if (!usuario) {
         return res.status(404).json({ erro: "Usuário não encontrado" });
       }
-      
+
       return res.json({
         id: usuario.id,
         nome_completo: usuario.nome_completo,
@@ -482,27 +482,132 @@ module.exports = {
   async deletar(req, res) {
     try {
       const usuario = await Usuario.findByPk(req.params.id);
-      
+
       if (!usuario) {
         return res.status(404).json({ erro: "Usuário não encontrado" });
       }
-      
+
       if (usuario.foto) {
         const fotoPath = path.join(__dirname, '..', usuario.foto);
         if (fs.existsSync(fotoPath)) {
           fs.unlinkSync(fotoPath);
         }
       }
-      
+
       await usuario.destroy();
-      
-      return res.json({ 
-        sucesso: true, 
-        mensagem: "Usuário removido com sucesso" 
+
+      return res.json({
+        sucesso: true,
+        mensagem: "Usuário removido com sucesso"
       });
     } catch (error) {
       console.error('❌ Erro ao deletar:', error);
       return res.status(500).json({ erro: error.message });
     }
+  },
+  // RECUPERAR SENHA - Verificar email
+  async verificarEmail(req, res) {
+    try {
+      console.log('\n📧 ====== VERIFICANDO EMAIL ======');
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ erro: "Email é obrigatório" });
+      }
+
+      const emailClean = email.trim().toLowerCase();
+      console.log('📧 Email a verificar:', emailClean);
+
+      const usuario = await Usuario.findOne({
+        where: { email: emailClean },
+        attributes: ['id', 'nome_completo', 'email', 'cpf']
+      });
+
+      if (!usuario) {
+        console.log('❌ Email não encontrado');
+        return res.status(404).json({
+          erro: "Email não encontrado",
+          mensagem: "Este email não está cadastrado"
+        });
+      }
+
+      console.log('✅ Email encontrado!');
+      console.log('  - ID:', usuario.id);
+      console.log('  - Nome:', usuario.nome_completo);
+      console.log('  - Email:', usuario.email);
+
+      return res.json({
+        sucesso: true,
+        mensagem: "Email verificado com sucesso",
+        usuario: {
+          id: usuario.id,
+          nome_completo: usuario.nome_completo,
+          email: usuario.email,
+          cpf: usuario.cpf
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao verificar email:', error);
+      return res.status(500).json({
+        erro: "Erro interno do servidor",
+        detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  },
+
+  // REDEFINIR SENHA
+  async redefinirSenha(req, res) {
+    try {
+      console.log('\n🔑 ====== REDEFININDO SENHA ======');
+      const { email, nova_senha, codigo } = req.body;
+
+      if (!email || !nova_senha || !codigo) {
+        return res.status(400).json({
+          erro: "Email, nova senha e código são obrigatórios"
+        });
+      }
+
+      if (nova_senha.length < 4) {
+        return res.status(400).json({
+          erro: "A senha deve ter pelo menos 4 caracteres"
+        });
+      }
+
+      const emailClean = email.trim().toLowerCase();
+      console.log('📧 Email:', emailClean);
+      console.log('🔑 Código recebido:', codigo);
+
+      const usuario = await Usuario.findOne({
+        where: { email: emailClean }
+      });
+
+      if (!usuario) {
+        console.log('❌ Usuário não encontrado');
+        return res.status(404).json({
+          erro: "Usuário não encontrado"
+        });
+      }
+
+      const senhaHash = await bcrypt.hash(nova_senha, 10);
+      await usuario.update({ senha_hash: senhaHash });
+
+      console.log('✅ Senha atualizada com sucesso!');
+      console.log('  - ID:', usuario.id);
+      console.log('  - Nome:', usuario.nome_completo);
+
+      return res.json({
+        sucesso: true,
+        mensagem: "Senha redefinida com sucesso"
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao redefinir senha:', error);
+      return res.status(500).json({
+        erro: "Erro interno do servidor",
+        detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
   }
+
 };

@@ -60,7 +60,7 @@ function CustomDrawerContent(props: any) {
     }
   };
 
-  if (pathname === '/login' || pathname === '/RegisterScreen' || pathname === '/recuperarSenha') return null;
+  if (pathname === '/login' || pathname === '/recuperarSenha') return null;
 
   const getFotoUrl = (fotoPath: string | null): string | null => {
     if (!fotoPath) return null;
@@ -82,9 +82,9 @@ function CustomDrawerContent(props: any) {
     return tipo === 1 ? '#2196F3' : '#4CAF50';
   };
 
-  const menuItems: { label: string; icon: string; route: Href }[] = [
-    { label: 'Home', icon: 'home', route: '/(tabs)' },
-    { label: 'Sobre', icon: 'information', route: '/sobre' },
+  const menuItems: { label: string; icon: string; route: Href; iconBg?: string; iconColor?: string }[] = [
+    { label: 'Home', icon: 'home', route: '/(tabs)', iconBg: '#FFF0F0', iconColor: '#8B0000' },
+    { label: 'Sobre', icon: 'information', route: '/sobre', iconBg: '#E3F2FD', iconColor: '#1565C0' },
   ];
 
   const isAdmin = userData?.tipo_usuario === 1;
@@ -98,112 +98,137 @@ function CustomDrawerContent(props: any) {
     }, 200);
   };
 
+  const isActive = (route: string) => {
+    if (route === '/(tabs)' && pathname === '/') return true;
+    if (route === '/(tabs)' && pathname.startsWith('/(tabs)')) return true;
+    if (route === '/admin/RegisterScreen' && pathname === '/admin/RegisterScreen') return true;
+    return pathname === route;
+  };
+
   return (
     <DrawerContentScrollView 
       {...props} 
       contentContainerStyle={styles.drawerContainer}
     >
       <View style={styles.drawerHeader}>
-        <View style={styles.avatarContainer}>
-          {fotoUrl ? (
-            <Image 
-              source={{ uri: fotoUrl }} 
-              style={styles.avatarImage}
-              onError={(e) => {
-                console.log('❌ Drawer: Erro ao carregar foto:', e.nativeEvent.error);
-              }}
-            />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarFallbackText}>
-                {userData?.nome_completo?.charAt(0)?.toUpperCase() || 'U'}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../assets/images/logomk.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>MKHealth</Text>
+        </View>
+
+        <View style={styles.dividerLine} />
+
+        <View style={styles.profileContainer}>
+          <View style={styles.avatarContainer}>
+            {fotoUrl ? (
+              <Image 
+                source={{ uri: fotoUrl }} 
+                style={styles.avatarImage}
+                onError={(e) => {
+                  console.log('❌ Drawer: Erro ao carregar foto:', e.nativeEvent.error);
+                }}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>
+                  {userData?.nome_completo?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <Text style={styles.userName} numberOfLines={1}>
+            {userData?.nome_completo || userData?.name || 'Usuário'}
+          </Text>
+          
+          {userData?.tipo_usuario !== undefined && (
+            <View style={[
+              styles.userTypeBadge,
+              { backgroundColor: getTipoUsuarioColor(userData.tipo_usuario) }
+            ]}>
+              <MaterialCommunityIcons 
+                name={getTipoUsuarioIcon(userData.tipo_usuario) as any} 
+                color="#FFFFFF" 
+                size={14} 
+              />
+              <Text style={styles.userTypeText}>
+                {getTipoUsuarioDescricao(userData.tipo_usuario)}
               </Text>
             </View>
           )}
-        </View>
-        
-        <Text style={styles.userName}>
-          {userData?.nome_completo || userData?.name || 'Usuário'}
-        </Text>
-        
-        {userData?.tipo_usuario !== undefined && (
-          <View style={[
-            styles.userTypeBadge,
-            { backgroundColor: getTipoUsuarioColor(userData.tipo_usuario) }
-          ]}>
-            <MaterialCommunityIcons 
-              name={getTipoUsuarioIcon(userData.tipo_usuario) as any} 
-              color="#FFFFFF" 
-              size={16} 
-            />
-            <Text style={styles.userTypeText}>
-              {getTipoUsuarioDescricao(userData.tipo_usuario)}
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.userInfoContainer}>
-          <View style={styles.userInfoRow}>
-            <MaterialCommunityIcons name="account" size={16} color="#FFF" />
-            <Text style={styles.userDetail}>
-              CPF: {userData?.cpf || userData?.document || '---'}
-            </Text>
-          </View>
-          <View style={styles.userInfoRow}>
-            <MaterialCommunityIcons name="email" size={16} color="#FFF" />
-            <Text style={styles.userDetail} numberOfLines={1}>
-              {userData?.email || ''}
-            </Text>
+          
+          <View style={styles.userInfoContainer}>
+            <View style={styles.userInfoRow}>
+              <MaterialCommunityIcons name="account" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.userDetail} numberOfLines={1}>
+                CPF: {userData?.cpf || userData?.document || '---'}
+              </Text>
+            </View>
+            <View style={styles.userInfoRow}>
+              <MaterialCommunityIcons name="email" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.userDetail} numberOfLines={1}>
+                {userData?.email || ''}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
       
       <View style={styles.drawerItems}>
-        {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.route.toString()}
-            style={styles.menuItem}
-            onPress={() => navigateTo(item.route.toString())}
-          >
-            <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name={item.icon as any} size={24} color="#8B0000" />
-            </View>
-            <Text style={styles.menuItemLabel}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {menuItems.map((item) => {
+          const active = isActive(item.route.toString());
+          return (
+            <TouchableOpacity
+              key={item.route.toString()}
+              style={[
+                styles.menuItem,
+                active && styles.menuItemActive
+              ]}
+              onPress={() => navigateTo(item.route.toString())}
+            >
+              <View style={[
+                styles.menuIconContainer,
+                { backgroundColor: item.iconBg || '#F8F8F8' },
+                active && styles.menuIconContainerActive
+              ]}>
+                <MaterialCommunityIcons 
+                  name={item.icon as any} 
+                  size={22} 
+                  color={active ? '#FFF' : (item.iconColor || '#8B0000')} 
+                />
+              </View>
+              <Text style={[
+                styles.menuItemLabel,
+                active && styles.menuItemLabelActive
+              ]}>
+                {item.label}
+              </Text>
+              {active && (
+                <View style={styles.activeIndicator} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
 
         {isAdmin && (
           <>
             <View style={styles.divider} />
             
+            <Text style={styles.adminSectionTitle}>🔐 Administração</Text>
+            
+            {/* 🔥 SÓ O GERENCIAR USUÁRIO, REMOVIDO O ADMIN */}
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => navigateTo('/RegisterScreen')}
+              onPress={() => navigateTo('/admin/RegisterScreen')}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                <MaterialCommunityIcons name="account-plus" size={24} color="#2E7D32" />
+                <MaterialCommunityIcons name="account-plus" size={22} color="#2E7D32" />
               </View>
-              <Text style={styles.menuItemLabel}>Cadastrar Usuário</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => navigateTo('/admin')}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FFF3E0' }]}>
-                <MaterialCommunityIcons name="shield-account" size={24} color="#E65100" />
-              </View>
-              <Text style={styles.menuItemLabel}>Admin</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => navigateTo('/recuperarSenha')}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FFF3E0' }]}>
-                <MaterialCommunityIcons name="key" size={24} color="#E65100" />
-              </View>
-              <Text style={styles.menuItemLabel}>Recuperar Senha</Text>
+              <Text style={styles.menuItemLabel}>Gerenciar Usuário</Text>
             </TouchableOpacity>
           </>
         )}
@@ -214,69 +239,18 @@ function CustomDrawerContent(props: any) {
           style={styles.logoutItem}
           onPress={handleLogout}
         >
-          <View style={styles.menuIconContainer}>
-            <MaterialCommunityIcons name="logout" size={24} color="#8B0000" />
+          <View style={[styles.menuIconContainer, { backgroundColor: '#FFEBEE' }]}>
+            <MaterialCommunityIcons name="logout" size={22} color="#D32F2F" />
           </View>
           <Text style={styles.logoutLabel}>Sair</Text>
         </TouchableOpacity>
+        
+        <View style={styles.footerVersion}>
+          <Text style={styles.footerVersionText}>MKHealth v1.0.0</Text>
+        </View>
       </View>
     </DrawerContentScrollView>
   );
-}
-
-function AdminRouteGuard({ children }: { children: React.ReactNode }) {
-  const [userData, setUserData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    verificarAcesso();
-  }, []);
-
-  const verificarAcesso = async () => {
-    try {
-      const data = await getUserData();
-      setUserData(data);
-      console.log('🔐 Verificando acesso admin...');
-      console.log('📌 Tipo usuário:', data?.tipo_usuario);
-      
-      if (data?.tipo_usuario !== 1) {
-        console.log('🚫 Acesso negado!');
-        Alert.alert(
-          'Acesso Negado',
-          'Esta área é restrita para médicos.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(tabs)');
-              }
-            }
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('❌ Erro ao verificar acesso:', error);
-      router.replace('/(tabs)');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B0000" />
-        <Text style={styles.loadingText}>Verificando acesso...</Text>
-      </View>
-    );
-  }
-
-  if (userData?.tipo_usuario === 1) {
-    return <>{children}</>;
-  }
-
-  return null;
 }
 
 export default function RootLayout() {
@@ -301,7 +275,6 @@ export default function RootLayout() {
     verificarAutenticacao();
   }, []);
 
-  // 🔥 IMPORTANTE: Verificar sempre que a rota mudar
   useEffect(() => {
     verificarAutenticacao();
   }, [pathname]);
@@ -317,9 +290,8 @@ export default function RootLayout() {
     );
   }
 
-  const publicRoutes = ['/login', '/RegisterScreen', '/recuperarSenha'];
+  const publicRoutes = ['/login', '/recuperarSenha'];
 
-  // 🔥 REGRA 1: Não logado e em rota privada → vai pro login
   if (!isAuthenticatedState && !publicRoutes.includes(pathname)) {
     console.log('🚀 Redirecionando para login...');
     return (
@@ -329,7 +301,6 @@ export default function RootLayout() {
     );
   }
 
-  // 🔥 REGRA 2: Logado e em rota pública → vai pra home
   if (isAuthenticatedState && publicRoutes.includes(pathname)) {
     console.log('🚀 Usuário logado, redirecionando para home...');
     return (
@@ -339,30 +310,7 @@ export default function RootLayout() {
     );
   }
 
-  // 🔥 REGRA 3: Rota Admin
-  if (pathname === '/admin') {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <AdminRouteGuard>
-          <Drawer
-            drawerContent={(props) => <CustomDrawerContent {...props} />}
-            screenOptions={{
-              headerShown: false,
-              drawerStyle: { 
-                width: '85%',
-                backgroundColor: '#FFF',
-              },
-              swipeEnabled: true,
-            }}
-          >
-            <Drawer.Screen name="admin" options={{ title: 'Admin' }} />
-          </Drawer>
-        </AdminRouteGuard>
-      </GestureHandlerRootView>
-    );
-  }
-
-  // 🔥 REGRA 4: Rotas principais com Drawer
+  // 🔥 LAYOUT ÚNICO PARA TODAS AS ROTAS
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ExamesProvider>
@@ -371,16 +319,23 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             drawerStyle: { 
-              width: '85%',
+              width: '80%',
               backgroundColor: '#FFF',
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 20,
             },
             swipeEnabled: true,
           }}
         >
+          {/* ROTAS PRINCIPAIS */}
           <Drawer.Screen name="(tabs)" options={{ title: 'Home' }} />
           <Drawer.Screen name="sobre" options={{ title: 'Sobre' }} />
+          
+          {/* ROTAS ADMIN (VISÍVEIS NO DRAWER, MAS COM PROTEÇÃO NA TELA) */}
+          <Drawer.Screen name="admin/RegisterScreen" options={{ title: 'Gerenciar Usuário' }} />
+          
+          {/* ROTAS OCULTAS */}
           <Drawer.Screen name="login" options={{ drawerItemStyle: { display: 'none' } }} />
-          <Drawer.Screen name="RegisterScreen" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="recuperarSenha" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="index" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="admin" options={{ drawerItemStyle: { display: 'none' } }} />
@@ -397,151 +352,218 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
   },
+  
   drawerHeader: {
     backgroundColor: '#8B0000',
-    paddingVertical: 30,
+    paddingVertical: 20,
     paddingHorizontal: 20,
-    alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    marginBottom: 15,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  logoImage: {
+    width: 45,
+    height: 45,
+    tintColor: '#FFF',
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginLeft: 10,
+    letterSpacing: 1,
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 15,
+  },
+  
+  profileContainer: {
+    alignItems: 'center',
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: '#FFF',
-    marginBottom: 10,
+    borderColor: '#FFD700',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     resizeMode: 'cover',
   },
   avatarFallback: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 75,
+    height: 75,
+    borderRadius: 37.5,
     backgroundColor: '#FFD700',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarFallbackText: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: 'bold',
     color: '#8B0000',
   },
   userName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#FFF',
     textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 4,
+    maxWidth: '90%',
   },
   userTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
     borderRadius: 20,
-    marginTop: 5,
     marginBottom: 10,
-    gap: 6,
+    gap: 5,
   },
   userTypeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   userInfoContainer: {
     width: '100%',
-    marginTop: 5,
+    marginTop: 2,
   },
   userInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 3,
+    marginTop: 2,
   },
   userDetail: {
-    fontSize: 13,
-    color: '#FFF',
-    marginLeft: 6,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginLeft: 5,
     textAlign: 'center',
-    opacity: 0.9,
   },
+  
   drawerItems: { 
     flex: 1,
     paddingTop: 5,
+    paddingHorizontal: 15,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginHorizontal: 15,
-    marginVertical: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginVertical: 3,
     borderRadius: 12,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  menuItemActive: {
+    backgroundColor: '#FFF5F5',
   },
   menuIconContainer: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 10,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F8F8F8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginRight: 14,
+  },
+  menuIconContainerActive: {
+    backgroundColor: '#8B0000',
   },
   menuItemLabel: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#444',
     fontWeight: '500',
+    flex: 1,
+  },
+  menuItemLabelActive: {
+    color: '#8B0000',
+    fontWeight: 'bold',
+  },
+  activeIndicator: {
+    width: 4,
+    height: 24,
+    backgroundColor: '#8B0000',
+    borderRadius: 2,
+    position: 'absolute',
+    right: 0,
   },
   divider: {
     height: 1,
-    backgroundColor: '#E0E0E0',
-    marginVertical: 10,
-    marginHorizontal: 20,
+    backgroundColor: '#E8E8E8',
+    marginVertical: 12,
+    marginHorizontal: 10,
   },
+  adminSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginLeft: 15,
+    marginBottom: 8,
+  },
+  
   logoutButton: {
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 5,
+    paddingTop: 12,
     paddingHorizontal: 15,
-    marginBottom: 20,
+    paddingBottom: 10,
   },
   logoutItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderRadius: 12,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FFF5F5',
   },
   logoutLabel: {
-    fontSize: 16,
-    marginLeft: 15,
-    color: '#8B0000',
-    fontWeight: 'bold',
+    fontSize: 15,
+    marginLeft: 14,
+    color: '#D32F2F',
+    fontWeight: '600',
   },
+  footerVersion: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  footerVersionText: {
+    fontSize: 11,
+    color: '#BBB',
+    letterSpacing: 0.5,
+  },
+  
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

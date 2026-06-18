@@ -1,14 +1,16 @@
 // app/login.tsx
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -16,13 +18,22 @@ import {
   View,
 } from 'react-native';
 import { USUARIOS_URL } from '../service/api';
-import { saveUserData } from '../service/auth'; // 🔥 IMPORTAR A FUNÇÃO
+import { saveUserData } from '../service/auth';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // 🔥 STATES DOS MODAIS
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTipo, setModalTipo] = useState<'sucesso' | 'erro' | 'info' | 'confirmacao'>('info');
+  const [modalTitulo, setModalTitulo] = useState('');
+  const [modalMensagem, setModalMensagem] = useState('');
+  const [modalBotaoTexto, setModalBotaoTexto] = useState('OK');
+  const [modalAcao, setModalAcao] = useState<(() => void) | null>(null);
+  const [modalBotaoSecundario, setModalBotaoSecundario] = useState<{ texto: string; acao: () => void } | null>(null);
 
   const formatCPF = (value: string) => {
     const cpfClean = value.replace(/\D/g, '');
@@ -36,20 +47,57 @@ export default function LoginScreen() {
     return cpf.replace(/\D/g, '');
   };
 
+  // 🔥 FUNÇÕES PARA ABRIR MODAIS
+  const abrirModal = (
+    tipo: 'sucesso' | 'erro' | 'info' | 'confirmacao',
+    titulo: string,
+    mensagem: string,
+    botaoTexto: string = 'OK',
+    acao?: () => void,
+    botaoSecundario?: { texto: string; acao: () => void }
+  ) => {
+    setModalTipo(tipo);
+    setModalTitulo(titulo);
+    setModalMensagem(mensagem);
+    setModalBotaoTexto(botaoTexto);
+    setModalAcao(() => acao || null);
+    setModalBotaoSecundario(botaoSecundario || null);
+    setModalVisible(true);
+  };
+
+  const fecharModal = () => {
+    setModalVisible(false);
+    if (modalAcao) {
+      modalAcao();
+    }
+  };
+
   const handleLogin = async () => {
     if (!cpf.trim()) {
-      Alert.alert('Erro', 'Digite seu CPF');
+      abrirModal(
+        'erro',
+        '⚠️ Campo Vazio',
+        'Por favor, digite seu CPF para continuar.'
+      );
       return;
     }
 
     const cpfLimpo = limparCPF(cpf);
     if (cpfLimpo.length !== 11) {
-      Alert.alert('Erro', 'CPF inválido. Digite 11 números.');
+      abrirModal(
+        'erro',
+        '📄 CPF Inválido',
+        'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00'
+      );
       return;
     }
 
     if (!password.trim()) {
-      Alert.alert('Erro', 'Digite sua senha');
+      abrirModal(
+        'erro',
+        '🔒 Campo Vazio',
+        'Por favor, digite sua senha para continuar.'
+      );
       return;
     }
 
@@ -75,25 +123,53 @@ export default function LoginScreen() {
       console.log('📡 Resposta:', JSON.stringify(data, null, 2));
 
       if (response.status === 404) {
-        Alert.alert('Erro', 'Usuário não encontrado.');
+        abrirModal(
+          'erro',
+          '🔍 Usuário não encontrado',
+          'Não encontramos um usuário com este CPF.\n\nVerifique o CPF informado e tente novamente.',
+          'Tentar Novamente',
+          undefined,
+          {
+            texto: 'Criar Conta',
+            acao: () => router.push('/admin/RegisterScreen')
+          }
+        );
         setLoading(false);
         return;
       }
 
       if (response.status === 401) {
-        Alert.alert('Erro', 'Senha incorreta.');
+        abrirModal(
+          'erro',
+          '🔒 Senha incorreta',
+          'A senha informada está incorreta.\n\nVerifique sua senha e tente novamente.',
+          'Tentar Novamente',
+          undefined,
+          {
+            texto: 'Esqueci minha senha',
+            acao: () => router.push('/recuperarSenha')
+          }
+        );
         setLoading(false);
         return;
       }
 
       if (!response.ok) {
-        Alert.alert('Erro', data.erro || 'Erro ao fazer login');
+        abrirModal(
+          'erro',
+          '❌ Erro no Login',
+          data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.'
+        );
         setLoading(false);
         return;
       }
 
       if (!data.token || !data.usuario) {
-        Alert.alert('Erro', 'Resposta do servidor inválida.');
+        abrirModal(
+          'erro',
+          '❌ Resposta Inválida',
+          'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.'
+        );
         setLoading(false);
         return;
       }
@@ -102,16 +178,18 @@ export default function LoginScreen() {
         data.usuario.tipo_usuario = 0;
       }
 
-      // 🔥 USAR A FUNÇÃO DO AUTH PARA SALVAR
       const salvou = await saveUserData(data.token, data.usuario);
       
       if (!salvou) {
-        Alert.alert('Erro', 'Não foi possível salvar seus dados.');
+        abrirModal(
+          'erro',
+          '❌ Erro ao Salvar',
+          'Não foi possível salvar seus dados localmente.\n\nVerifique o armazenamento do dispositivo.'
+        );
         setLoading(false);
         return;
       }
 
-      // 🔥 VERIFICAR NOVAMENTE ANTES DE REDIRECIONAR
       const tokenFinal = await AsyncStorage.getItem('token');
       const userFinal = await AsyncStorage.getItem('userData');
       
@@ -121,32 +199,36 @@ export default function LoginScreen() {
 
       if (!tokenFinal || !userFinal) {
         console.error('❌ Dados sumiram!');
-        Alert.alert('Erro', 'Erro ao salvar dados. Tente novamente.');
+        abrirModal(
+          'erro',
+          '❌ Erro ao Salvar',
+          'Erro ao salvar seus dados. Tente novamente.'
+        );
         setLoading(false);
         return;
       }
 
       const tipoDescricao = data.usuario.tipo_usuario === 1 ? 'Médico' : 'Paciente';
       
-      Alert.alert(
-        'Sucesso!',
-        `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\nTipo: ${tipoDescricao}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              console.log('🚀 REDIRECIONANDO PARA HOME...');
-              // Forçar a navegação
-              router.replace('/(tabs)');
-            }
-          }
-        ],
-        { cancelable: false }
+      abrirModal(
+        'sucesso',
+        '✅ Login Realizado!',
+        `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\n👤 Tipo: ${tipoDescricao}`,
+        'ENTRAR',
+        () => {
+          console.log('🚀 REDIRECIONANDO PARA HOME...');
+          router.replace('/(tabs)');
+        }
       );
       
     } catch (error: any) {
       console.error('❌ ERRO no login:', error);
-      Alert.alert('Erro', error.message || 'Erro ao fazer login');
+      abrirModal(
+        'erro',
+        '❌ Erro de Conexão',
+        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.',
+        'Tentar Novamente'
+      );
     } finally {
       setLoading(false);
     }
@@ -158,6 +240,38 @@ export default function LoginScreen() {
 
   const navigateToRecuperarSenha = () => {
     router.push('/recuperarSenha');
+  };
+
+  // 🔥 RENDERIZAR ÍCONE DO MODAL
+  const renderModalIcon = () => {
+    switch (modalTipo) {
+      case 'sucesso':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconSuccess]}>
+            <Ionicons name="checkmark-circle" size={50} color="#4CAF50" />
+          </View>
+        );
+      case 'erro':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconError]}>
+            <Ionicons name="alert-circle" size={50} color="#F44336" />
+          </View>
+        );
+      case 'info':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconInfo]}>
+            <Ionicons name="information-circle" size={50} color="#2196F3" />
+          </View>
+        );
+      case 'confirmacao':
+        return (
+          <View style={[styles.modalIconCircle, styles.modalIconConfirm]}>
+            <Ionicons name="help-circle" size={50} color="#FF9800" />
+          </View>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -231,15 +345,76 @@ export default function LoginScreen() {
           >
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
-
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Não possui conta?</Text>
-            <TouchableOpacity onPress={navigateToRegister} disabled={loading}>
-              <Text style={styles.registerLink}> Cadastre-se</Text>
-            </TouchableOpacity>
-          </View>
+          
+          
         </View>
       </View>
+
+      {/* 🔥 MODAL UNIVERSAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={fecharModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={fecharModal}>
+          <View style={styles.modalContainer}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalIconContainer}>
+                {renderModalIcon()}
+              </View>
+
+              <Text style={[
+                styles.modalTitle,
+                modalTipo === 'sucesso' && styles.modalTitleSuccess,
+                modalTipo === 'erro' && styles.modalTitleError,
+                modalTipo === 'info' && styles.modalTitleInfo,
+                modalTipo === 'confirmacao' && styles.modalTitleConfirm,
+              ]}>
+                {modalTitulo}
+              </Text>
+
+              <Text style={[
+                styles.modalMensagem,
+                modalTipo === 'sucesso' && styles.modalMensagemSuccess,
+                modalTipo === 'erro' && styles.modalMensagemError,
+              ]}>
+                {modalMensagem}
+              </Text>
+
+              <View style={styles.modalBotoesContainer}>
+                {modalBotaoSecundario && (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSecundario]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      modalBotaoSecundario?.acao();
+                    }}
+                  >
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextSecundario]}>
+                      {modalBotaoSecundario.texto}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    modalTipo === 'sucesso' && styles.modalButtonSuccess,
+                    modalTipo === 'erro' && styles.modalButtonError,
+                    modalTipo === 'info' && styles.modalButtonInfo,
+                    modalTipo === 'confirmacao' && styles.modalButtonConfirm,
+                    modalBotaoSecundario && styles.modalButtonPrincipal,
+                  ]}
+                  onPress={fecharModal}
+                >
+                  <Text style={styles.modalButtonText}>{modalBotaoTexto}</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -397,5 +572,141 @@ const styles = StyleSheet.create({
     color: '#8B0000',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+
+  // 🔥 ESTILOS DO MODAL
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 30,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    marginBottom: 16,
+  },
+  modalIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+  },
+  modalIconSuccess: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+  },
+  modalIconError: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#F44336',
+  },
+  modalIconInfo: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+  },
+  modalIconConfirm: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF9800',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalTitleSuccess: {
+    color: '#2E7D32',
+  },
+  modalTitleError: {
+    color: '#C62828',
+  },
+  modalTitleInfo: {
+    color: '#0D47A1',
+  },
+  modalTitleConfirm: {
+    color: '#E65100',
+  },
+  modalMensagem: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalMensagemSuccess: {
+    color: '#1B5E20',
+  },
+  modalMensagemError: {
+    color: '#B71C1C',
+  },
+  modalBotoesContainer: {
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modalButtonSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonError: {
+    backgroundColor: '#F44336',
+  },
+  modalButtonInfo: {
+    backgroundColor: '#2196F3',
+  },
+  modalButtonConfirm: {
+    backgroundColor: '#FF9800',
+  },
+  modalButtonPrincipal: {
+    marginTop: 5,
+  },
+  modalButtonSecundario: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  modalButtonTextSecundario: {
+    color: '#666',
   },
 });

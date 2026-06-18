@@ -1,8 +1,9 @@
 // app/(tabs)/index.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,15 +19,15 @@ import {
 import { LineChart, PieChart, ProgressChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
+
 const { width: screenWidth } = Dimensions.get('window');
 
-// ✅ CORRIGIDO: Adicionei a porta :3000
 const API_URL = `http://${IP}:3000/api/exames`;
-
 
 interface Exame {
   id: number;
   paciente_nome: string;
+  paciente_cpf?: string;
   tipo_exame: string;
   data_exame: string;
   medico_solicitante: string;
@@ -56,7 +57,18 @@ interface ExamesPorTipo {
   cor: string;
 }
 
+interface UserData {
+  id: number;
+  nome_completo: string;
+  email: string;
+  cpf: string;
+  tipo_usuario: number;
+  foto: string | null;
+}
+
 export default function DashboardScreen() {
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [exames, setExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(false);
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
@@ -64,23 +76,65 @@ export default function DashboardScreen() {
   const [examesPorMes, setExamesPorMes] = useState<ExamesPorMes[]>([]);
   const [examesPorTipo, setExamesPorTipo] = useState<ExamesPorTipo[]>([]);
 
+  // 🔥 CARREGAR DADOS DO USUÁRIO
+  useEffect(() => {
+    carregarUsuario();
+  }, []);
+
+  const carregarUsuario = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const data = JSON.parse(userDataString);
+        setUserData(data);
+        setIsAdmin(data?.tipo_usuario === 1);
+        console.log('📱 Dashboard - Usuário:', data?.nome_completo);
+        console.log('📱 Dashboard - É admin?', data?.tipo_usuario === 1);
+        console.log('📱 Dashboard - CPF:', data?.cpf);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar usuário:', error);
+    }
+  };
+
   const carregarDados = async () => {
     console.log('🔄 Carregando dados...');
     setLoading(true);
     try {
       const response = await fetch(API_URL);
       const data: Exame[] = await response.json();
-      setExames(data);
       
-      calcularEstatisticas(data);
-      calcularDadosGraficos(data);
+      // 🔥 FILTRAR EXAMES BASEADO NO TIPO DE USUÁRIO
+      let examesFiltrados = data;
       
-      const ultimos = [...data].sort((a, b) => 
+      if (!isAdmin && userData) {
+        // Paciente vê apenas seus exames
+        const nomePaciente = userData.nome_completo?.toLowerCase().trim();
+        const cpfPaciente = userData.cpf?.replace(/\D/g, '');
+        
+        examesFiltrados = data.filter((exame: Exame) => {
+          const nomeExame = exame.paciente_nome?.toLowerCase().trim();
+          const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
+          return nomeExame === nomePaciente || cpfExame === cpfPaciente;
+        });
+        
+        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
+      } else {
+        console.log(`📱 Médico - ${data.length} exames encontrados`);
+      }
+      
+      setExames(examesFiltrados);
+      
+      // 🔥 CALCULAR ESTATÍSTICAS COM OS EXAMES FILTRADOS
+      calcularEstatisticas(examesFiltrados);
+      calcularDadosGraficos(examesFiltrados);
+      
+      const ultimos = [...examesFiltrados].sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ).slice(0, 5);
       setUltimosExames(ultimos);
       
-      console.log(`✅ ${data.length} exames carregados`);
+      console.log(`✅ ${examesFiltrados.length} exames carregados`);
     } catch (error) {
       console.error('❌ Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados');
@@ -125,7 +179,7 @@ export default function DashboardScreen() {
       ultimos6Meses.push(meses[data.getMonth()]);
     }
     
-    const examesPorMesData = ultimos6Meses.map((mes, index) => {
+    const examesPorMesData = ultimos6Meses.map((mes) => {
       const mesIndex = meses.indexOf(mes);
       const ano = hoje.getFullYear() - (mesIndex > hoje.getMonth() ? 1 : 0);
       const quantidade = data.filter(e => {
@@ -159,8 +213,10 @@ export default function DashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      carregarDados();
-    }, [])
+      if (userData) {
+        carregarDados();
+      }
+    }, [userData])
   );
 
   const formatarData = (dataString: string) => {
@@ -213,6 +269,8 @@ export default function DashboardScreen() {
     }
   };
 
+  const hasData = exames.length > 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" backgroundColor="#8B0000" />
@@ -224,21 +282,29 @@ export default function DashboardScreen() {
         }
       >
         <View style={styles.headerContainer}>
-          <Text style={styles.headerWelcome}>Dashboard</Text>
+          <Text style={styles.headerWelcome}>
+            {isAdmin ? '📊 Dashboard Médico' : '📊 Meus Exames'}
+          </Text>
           <View style={styles.userInfo}>
             <MaterialCommunityIcons name="account-circle" size={50} color="#DDD" />
             <View style={{ marginLeft: 10 }}>
-              <Text style={styles.userName}>Sistema MKHealth</Text>
-              <Text style={styles.userCpf}>Gestão de Exames</Text>
+              <Text style={styles.userName}>
+                {userData?.nome_completo || 'Sistema MKHealth'}
+              </Text>
+              <Text style={styles.userCpf}>
+                {isAdmin ? '👨‍⚕️ Médico - Todos os exames' : '👤 Paciente - Meus exames'}
+              </Text>
             </View>
             <Image source={require('../../assets/images/logomk.png')} style={styles.logoRight} />
           </View>
         </View>
 
-        {estatisticas && (
+        {hasData && estatisticas && (
           <>
             <View style={styles.statsContainer}>
-              <Text style={styles.sectionTitle}>📊 Estatísticas Gerais</Text>
+              <Text style={styles.sectionTitle}>
+                {isAdmin ? '📊 Estatísticas Gerais' : '📊 Minhas Estatísticas'}
+              </Text>
               
               <View style={styles.statsGrid}>
                 <View style={styles.statCard}>
@@ -253,17 +319,21 @@ export default function DashboardScreen() {
                   <Text style={styles.statLabel}>Pacientes</Text>
                 </View>
                 
-                <View style={styles.statCard}>
-                  <MaterialCommunityIcons name="doctor" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.total_medicos}</Text>
-                  <Text style={styles.statLabel}>Médicos</Text>
-                </View>
-                
-                <View style={styles.statCard}>
-                  <MaterialCommunityIcons name="flask" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.total_laboratorios}</Text>
-                  <Text style={styles.statLabel}>Laboratórios</Text>
-                </View>
+                {isAdmin && (
+                  <>
+                    <View style={styles.statCard}>
+                      <MaterialCommunityIcons name="doctor" size={28} color="#8B0000" />
+                      <Text style={styles.statNumber}>{estatisticas.total_medicos}</Text>
+                      <Text style={styles.statLabel}>Médicos</Text>
+                    </View>
+                    
+                    <View style={styles.statCard}>
+                      <MaterialCommunityIcons name="flask" size={28} color="#8B0000" />
+                      <Text style={styles.statNumber}>{estatisticas.total_laboratorios}</Text>
+                      <Text style={styles.statLabel}>Laboratórios</Text>
+                    </View>
+                  </>
+                )}
               </View>
 
               <View style={styles.statsRow}>
@@ -283,9 +353,11 @@ export default function DashboardScreen() {
             </View>
 
             {/* GRÁFICO DE LINHA - Exames por Mês */}
-            {examesPorMes.length > 0 && (
+            {examesPorMes.length > 0 && examesPorMes.some(item => item.quantidade > 0) && (
               <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>📈 Evolução de Exames (Últimos 6 meses)</Text>
+                <Text style={styles.sectionTitle}>
+                  📈 {isAdmin ? 'Evolução de Exames' : 'Meus Exames por Mês'} (Últimos 6 meses)
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <LineChart
                     data={lineChartData}
@@ -304,7 +376,9 @@ export default function DashboardScreen() {
             {/* GRÁFICO DE PIZZA - Tipos de Exame */}
             {pieChartData.length > 0 && (
               <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>🥧 Distribuição por Tipo de Exame</Text>
+                <Text style={styles.sectionTitle}>
+                  🥧 {isAdmin ? 'Distribuição por Tipo de Exame' : 'Meus Tipos de Exame'}
+                </Text>
                 <PieChart
                   data={pieChartData}
                   width={screenWidth - 30}
@@ -319,9 +393,11 @@ export default function DashboardScreen() {
             )}
 
             {/* GRÁFICO DE PROGRESSO - PDF vs Sem PDF */}
-            {estatisticas && (
+            {estatisticas && estatisticas.total_exames > 0 && (
               <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>📄 Proporção de Exames com PDF</Text>
+                <Text style={styles.sectionTitle}>
+                  📄 {isAdmin ? 'Proporção de Exames com PDF' : 'Meus Exames com PDF'}
+                </Text>
                 <ProgressChart
                   data={progressChartData}
                   width={screenWidth - 30}
@@ -337,7 +413,9 @@ export default function DashboardScreen() {
 
             {ultimosExames.length > 0 && (
               <View style={styles.ultimosContainer}>
-                <Text style={styles.sectionTitle}>📋 Últimos Exames</Text>
+                <Text style={styles.sectionTitle}>
+                  📋 {isAdmin ? 'Últimos Exames' : 'Meus Últimos Exames'}
+                </Text>
                 {ultimosExames.map((exame, index) => (
                   <TouchableOpacity 
                     key={index} 
@@ -359,6 +437,24 @@ export default function DashboardScreen() {
               </View>
             )}
           </>
+        )}
+
+        {!hasData && !loading && (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="file-document-outline" size={80} color="#CCCCCC" />
+            <Text style={styles.emptyTitle}>Nenhum exame encontrado</Text>
+            <Text style={styles.emptyText}>
+              {isAdmin ? 'Cadastre o primeiro exame' : 'Aguardando cadastro de exames'}
+            </Text>
+            {isAdmin && (
+              <TouchableOpacity 
+                style={styles.emptyButton}
+                onPress={() => router.push('/cadastro-exame')}
+              >
+                <Text style={styles.emptyButtonText}>Cadastrar Exame</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {loading && !estatisticas && (
@@ -446,7 +542,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   
-  // Estilos dos gráficos
   chartContainer: {
     backgroundColor: '#FFF',
     margin: 15,
@@ -516,5 +611,39 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 14,
     color: '#666',
+  },
+  
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    backgroundColor: '#FFF',
+    margin: 15,
+    borderRadius: 15,
+    padding: 30,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#CCC',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    backgroundColor: '#8B0000',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  emptyButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

@@ -1,8 +1,9 @@
 // app/(tabs)/_layout.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,14 +11,58 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const isAndroid = Platform.OS === 'android';
+  const [userData, setUserData] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
-  // Reorganizando a ordem dos itens: Home, Perfil, Novo Exame, Exames
-  const orderedRoutes = [
-    state.routes.find((route: any) => route.name === 'index'),
-    state.routes.find((route: any) => route.name === 'profile'),
-    state.routes.find((route: any) => route.name === 'cadastro-exame'),
-    state.routes.find((route: any) => route.name === 'exames'),
-  ].filter(Boolean);
+  useEffect(() => {
+    carregarUsuario();
+  }, []);
+
+  const carregarUsuario = async () => {
+    try {
+      // 🔥 FORÇAR RECARREGAR OS DADOS DO USUÁRIO
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const data = JSON.parse(userDataString);
+        setUserData(data);
+        setIsAdmin(data?.tipo_usuario === 1);
+        console.log('📱 TabBar - Usuário carregado:', data);
+        console.log('📱 TabBar - É admin?', data?.tipo_usuario === 1);
+      } else {
+        console.log('📱 TabBar - Nenhum usuário encontrado');
+      }
+    } catch (error) {
+      console.error('❌ TabBar - Erro ao carregar usuário:', error);
+    }
+  };
+
+  // 🔥 REORGANIZA OS ITENS BASEADO NO TIPO DE USUÁRIO
+  const getOrderedRoutes = () => {
+    const routes = [];
+    
+    // Sempre adiciona Home e Perfil
+    const homeRoute = state.routes.find((route: any) => route.name === 'index');
+    const profileRoute = state.routes.find((route: any) => route.name === 'profile');
+    const examesRoute = state.routes.find((route: any) => route.name === 'exames');
+    
+    if (homeRoute) routes.push(homeRoute);
+    if (profileRoute) routes.push(profileRoute);
+    
+    // 🔥 SÓ ADICIONA O BOTÃO DE NOVO EXAME SE FOR ADMIN
+    console.log('📱 TabBar - isAdmin:', isAdmin);
+    if (isAdmin) {
+      const cadastroRoute = state.routes.find((route: any) => route.name === 'cadastro-exame');
+      if (cadastroRoute) routes.push(cadastroRoute);
+      console.log('📱 TabBar - Adicionou cadastro-exame');
+    }
+    
+    if (examesRoute) routes.push(examesRoute);
+    
+    console.log('📱 TabBar - Rotas finais:', routes.map(r => r?.name));
+    return routes.filter(Boolean);
+  };
+  
+  const orderedRoutes = getOrderedRoutes();
   
   return (
     <View style={[
@@ -68,7 +113,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
         };
         
-        // Se for o botão Novo Exame (cadastro-exame) - posição central (índice 2)
+        // Se for o botão Novo Exame (cadastro-exame)
         if (route.name === 'cadastro-exame') {
           return (
             <TouchableOpacity
@@ -107,7 +152,32 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
 export default function TabLayout() {
   const navigation = useNavigation();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   
+  useEffect(() => {
+    verificarAdmin();
+  }, []);
+
+  const verificarAdmin = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const data = JSON.parse(userDataString);
+        setIsAdmin(data?.tipo_usuario === 1);
+        console.log('📱 TabLayout - É admin?', data?.tipo_usuario === 1);
+      }
+    } catch (error) {
+      console.error('❌ TabLayout - Erro:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return null;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -148,17 +218,18 @@ export default function TabLayout() {
         }}
       />
       
-      <Tabs.Screen
-        name="exames"
-        options={{
-          title: 'Exames',
-        }}
-      />
-      
+      {/* 🔥 SEMPRE REGISTRA A ROTA, MAS O TABBAR CONTROLARÁ A VISIBILIDADE */}
       <Tabs.Screen
         name="cadastro-exame"
         options={{
           title: 'Novo Exame',
+        }}
+      />
+      
+      <Tabs.Screen
+        name="exames"
+        options={{
+          title: 'Exames',
         }}
       />
     </Tabs>
@@ -191,7 +262,7 @@ const styles = StyleSheet.create({
     flex: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -20, // Sobressai mais para destaque
+    marginTop: -20,
   },
   specialButton: {
     backgroundColor: '#FFD700',
