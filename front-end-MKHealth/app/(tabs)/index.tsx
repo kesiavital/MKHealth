@@ -231,7 +231,7 @@ export default function DashboardScreen() {
               <Text style={styles.userName}>Sistema MKHealth</Text>
               <Text style={styles.userCpf}>Gestão de Exames</Text>
             </View>
-            <Image source={require('../img/logomk.png')} style={styles.logoRight} />
+            <Image source={require('../../assets/images/logomk.png')} style={styles.logoRight} />
           </View>
         </View>
 

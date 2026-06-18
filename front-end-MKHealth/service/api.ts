@@ -2,7 +2,7 @@
 // Configuração centralizada da API
 
 // IP DO SEU COMPUTADOR - ALTERE AQUI SE O IP MUDAR
-const IP = '192.168.0.12';  // ← SEU IP ATUAL
+const IP = '10.115.67.95';  // ← SEU IP ATUAL
 const PORTA = '3000';
 
 // URLs base (exporta da mesma forma que suas outras telas esperam)

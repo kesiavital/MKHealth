@@ -1,3 +1,4 @@
+// app/login.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BASE_URL, USUARIOS_URL } from '../service/api';
+import { USUARIOS_URL } from '../service/api';
+import { saveUserData } from '../service/auth'; // 🔥 IMPORTAR A FUNÇÃO
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // FORMATA CPF
   const formatCPF = (value: string) => {
     const cpfClean = value.replace(/\D/g, '');
     if (cpfClean.length <= 3) return cpfClean;
@@ -31,44 +32,11 @@ export default function LoginScreen() {
     return `${cpfClean.slice(0, 3)}.${cpfClean.slice(3, 6)}.${cpfClean.slice(6, 9)}-${cpfClean.slice(9, 11)}`;
   };
 
-  // REMOVE MÁSCARA
   const limparCPF = (cpf: string) => {
     return cpf.replace(/\D/g, '');
   };
 
-  // FUNÇÃO PARA SALVAR DADOS DO USUÁRIO
-  const salvarDadosUsuario = async (token: string, usuario: any) => {
-    try {
-      console.log('💾 Salvando dados do usuário...');
-      
-      // Salvar token
-      await AsyncStorage.setItem('token', token);
-      console.log('✅ Token salvo:', token.substring(0, 30) + '...');
-      
-      // Salvar usuário
-      await AsyncStorage.setItem('usuario', JSON.stringify(usuario));
-      console.log('✅ Usuário salvo:', usuario.nome_completo);
-      
-      // Verificar se salvou corretamente
-      const tokenVerificado = await AsyncStorage.getItem('token');
-      const usuarioVerificado = await AsyncStorage.getItem('usuario');
-      
-      if (tokenVerificado && usuarioVerificado) {
-        console.log('✅ VERIFICAÇÃO: Dados salvos com sucesso!');
-        return true;
-      } else {
-        console.log('❌ VERIFICAÇÃO: Falha ao salvar dados!');
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Erro ao salvar dados:', error);
-      return false;
-    }
-  };
-
-  // LOGIN
   const handleLogin = async () => {
-    // Validações
     if (!cpf.trim()) {
       Alert.alert('Erro', 'Digite seu CPF');
       return;
@@ -88,12 +56,8 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // 🔴 ALTERADO: /logar -> /login (CORRIGIDO)
       const loginUrl = `${USUARIOS_URL}/login`;
-      console.log('📡 Conectando ao servidor:', BASE_URL);
-      console.log('📡 URL completa:', loginUrl);
-      console.log('📡 CPF enviado:', cpfLimpo);
-      console.log('📡 Senha enviada:', '***');
+      console.log('📡 ====== INICIANDO LOGIN ======');
 
       const response = await fetch(loginUrl, {
         method: 'POST',
@@ -107,100 +71,93 @@ export default function LoginScreen() {
         }),
       });
 
-      console.log('📡 Status da resposta:', response.status);
-
       const data = await response.json();
-      console.log('📡 Resposta do backend:', JSON.stringify(data, null, 2));
+      console.log('📡 Resposta:', JSON.stringify(data, null, 2));
 
-      // Tratamento de erros
       if (response.status === 404) {
-        Alert.alert('Erro', 'Usuário não encontrado. Verifique seu CPF.');
+        Alert.alert('Erro', 'Usuário não encontrado.');
+        setLoading(false);
         return;
       }
 
       if (response.status === 401) {
-        Alert.alert('Erro', 'Senha incorreta. Tente novamente.');
+        Alert.alert('Erro', 'Senha incorreta.');
+        setLoading(false);
         return;
       }
 
       if (!response.ok) {
         Alert.alert('Erro', data.erro || 'Erro ao fazer login');
+        setLoading(false);
         return;
       }
 
-      // Verificar se o backend retornou os dados necessários
-      if (!data.token) {
-        console.error('❌ Backend não retornou token!');
-        Alert.alert('Erro', 'Resposta do servidor inválida. Tente novamente.');
+      if (!data.token || !data.usuario) {
+        Alert.alert('Erro', 'Resposta do servidor inválida.');
+        setLoading(false);
         return;
       }
 
-      if (!data.usuario) {
-        console.error('❌ Backend não retornou dados do usuário!');
-        Alert.alert('Erro', 'Resposta do servidor inválida. Tente novamente.');
-        return;
+      if (data.usuario.tipo_usuario === undefined) {
+        data.usuario.tipo_usuario = 0;
       }
 
-      // Salvar dados
-      const salvou = await salvarDadosUsuario(data.token, data.usuario);
+      // 🔥 USAR A FUNÇÃO DO AUTH PARA SALVAR
+      const salvou = await saveUserData(data.token, data.usuario);
       
       if (!salvou) {
-        Alert.alert('Erro', 'Não foi possível salvar seus dados. Tente novamente.');
+        Alert.alert('Erro', 'Não foi possível salvar seus dados.');
+        setLoading(false);
         return;
       }
 
-      // Sucesso!
+      // 🔥 VERIFICAR NOVAMENTE ANTES DE REDIRECIONAR
+      const tokenFinal = await AsyncStorage.getItem('token');
+      const userFinal = await AsyncStorage.getItem('userData');
+      
+      console.log('🔍 Verificação final antes de redirecionar:');
+      console.log('📌 Token existe?', !!tokenFinal);
+      console.log('📌 UserData existe?', !!userFinal);
+
+      if (!tokenFinal || !userFinal) {
+        console.error('❌ Dados sumiram!');
+        Alert.alert('Erro', 'Erro ao salvar dados. Tente novamente.');
+        setLoading(false);
+        return;
+      }
+
+      const tipoDescricao = data.usuario.tipo_usuario === 1 ? 'Médico' : 'Paciente';
+      
       Alert.alert(
         'Sucesso!',
-        `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!`,
+        `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\nTipo: ${tipoDescricao}`,
         [
           {
             text: 'OK',
             onPress: () => {
-              console.log('🚀 Redirecionando para Home...');
+              console.log('🚀 REDIRECIONANDO PARA HOME...');
+              // Forçar a navegação
               router.replace('/(tabs)');
             }
           }
-        ]
+        ],
+        { cancelable: false }
       );
       
     } catch (error: any) {
       console.error('❌ ERRO no login:', error);
-      
-      if (error.message === 'Network request failed') {
-        Alert.alert(
-          'Erro de Conexão',
-          `Não foi possível conectar ao servidor.\n\nVerifique:\n• O backend está rodando?\n• IP correto: ${BASE_URL}\n• Mesma rede Wi-Fi\n• Firewall liberado`
-        );
-      } else if (error.name === 'AbortError') {
-        Alert.alert('Timeout', 'A requisição demorou muito tempo. Verifique sua conexão.');
-      } else {
-        Alert.alert('Erro', error.message || 'Erro interno ao fazer login');
-      }
+      Alert.alert('Erro', error.message || 'Erro ao fazer login');
     } finally {
       setLoading(false);
     }
   };
 
-  // Função para navegar para o cadastro
   const navigateToRegister = () => {
-    console.log('🔵🔵🔵 NAVEGANDO PARA CADASTRO 🔵🔵🔵');
-    console.log('🔵 Router disponível:', !!router);
-    
-    try {
-      router.push('/RegisterScreen' as any);
-      console.log('✅ Navegação executada com sucesso!');
-    } catch (error) {
-      console.error('❌ Erro na navegação:', error);
-      
-      try {
-        router.push('RegisterScreen' as any);
-        console.log('✅ Navegação fallback executada!');
-      } catch (error2) {
-        console.error('❌ Fallback também falhou:', error2);
-        Alert.alert('Erro', 'Não foi possível abrir a tela de cadastro');
-      }
-    }
+    router.push('/admin/RegisterScreen');
+  };
+
+  const navigateToRecuperarSenha = () => {
+    router.push('/recuperarSenha');
   };
 
   return (
@@ -212,20 +169,19 @@ export default function LoginScreen() {
       <View style={styles.backgroundCircle} />
       
       <View style={styles.content}>
-        {/* LOGO */}
         <View style={styles.logoContainer}>
           <Image
-            source={require('./img/logomk.png')}
+            source={require('../assets/images/logomk.png')}
             style={styles.logo}
           />
+          <Text style={styles.logoText}>MKHealth</Text>
+          <Text style={styles.logoSubtext}>Sistema de Exames</Text>
         </View>
 
-        {/* CARD DE LOGIN */}
         <View style={styles.card}>
           <Text style={styles.title}>Acesse sua conta</Text>
           <Text style={styles.subtitle}>Consulte seus exames online</Text>
 
-          {/* CAMPO CPF */}
           <Text style={styles.label}>CPF</Text>
           <TextInput
             style={styles.input}
@@ -237,7 +193,6 @@ export default function LoginScreen() {
             editable={!loading}
           />
 
-          {/* CAMPO SENHA */}
           <Text style={styles.label}>Senha</Text>
           <View style={styles.passwordContainer}>
             <TextInput
@@ -257,7 +212,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* BOTÃO LOGIN */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
@@ -270,22 +224,17 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* ESQUECI SENHA */}
           <TouchableOpacity
             style={styles.forgotButton}
-            onPress={() => router.push('/esqueci')}
+            onPress={navigateToRecuperarSenha}
             disabled={loading}
           >
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
 
-          {/* CADASTRO */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Não possui conta?</Text>
-            <TouchableOpacity
-              onPress={navigateToRegister}
-              disabled={loading}
-            >
+            <TouchableOpacity onPress={navigateToRegister} disabled={loading}>
               <Text style={styles.registerLink}> Cadastre-se</Text>
             </TouchableOpacity>
           </View>
@@ -320,10 +269,22 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 180,
-    height: 180,
+    width: 120,
+    height: 120,
     resizeMode: 'contain',
     tintColor: '#FFF',
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginTop: 5,
+  },
+  logoSubtext: {
+    fontSize: 16,
+    color: '#FFF',
+    opacity: 0.8,
+    marginTop: 2,
   },
   card: {
     backgroundColor: '#FFF',
@@ -415,8 +376,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   forgotText: {
-    color: '#777',
+    color: '#8B0000',
     fontSize: 14,
+    fontWeight: '600',
   },
   registerContainer: {
     flexDirection: 'row',

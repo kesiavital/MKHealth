@@ -9,16 +9,16 @@ export const logout = async () => {
     
     // Verificar o que tem antes de limpar
     const tokenBefore = await AsyncStorage.getItem('token');
-    const usuarioBefore = await AsyncStorage.getItem('usuario');
+    const usuarioBefore = await AsyncStorage.getItem('userData');
     console.log('📦 Antes do logout - Token:', tokenBefore ? '✅ Presente' : '❌ Ausente');
     console.log('📦 Antes do logout - Usuário:', usuarioBefore ? '✅ Presente' : '❌ Ausente');
     
     // Limpar todos os dados de autenticação
-    await AsyncStorage.multiRemove(['token', 'usuario', '@user_session']);
+    await AsyncStorage.multiRemove(['token', 'userData', '@user_session']);
     
     // Verificar se limpou
     const tokenAfter = await AsyncStorage.getItem('token');
-    const usuarioAfter = await AsyncStorage.getItem('usuario');
+    const usuarioAfter = await AsyncStorage.getItem('userData');
     console.log('📦 Depois do logout - Token:', tokenAfter ? '⚠️ Ainda presente' : '✅ Limpo');
     console.log('📦 Depois do logout - Usuário:', usuarioAfter ? '⚠️ Ainda presente' : '✅ Limpo');
     
@@ -43,7 +43,7 @@ export const getAuthToken = async () => {
 
 export const getUserData = async () => {
   try {
-    const userData = await AsyncStorage.getItem('usuario');
+    const userData = await AsyncStorage.getItem('userData');
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
     console.error('Erro ao buscar dados do usuário:', error);
@@ -54,9 +54,11 @@ export const getUserData = async () => {
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const token = await AsyncStorage.getItem('token');
-    const usuario = await AsyncStorage.getItem('usuario');
-    const isAuth = !!(token && usuario);
+    const userData = await AsyncStorage.getItem('userData');
+    const isAuth = !!(token && userData);
     console.log('🔐 Verificando autenticação:', isAuth ? '✅ Logado' : '❌ Não logado');
+    console.log('📌 Token existe?', !!token);
+    console.log('📌 UserData existe?', !!userData);
     return isAuth;
   } catch (error) {
     console.error('Erro ao verificar autenticação:', error);
@@ -69,12 +71,12 @@ export const saveUserData = async (token: string, userData: any) => {
   try {
     console.log('💾 Salvando dados do usuário no auth...');
     await AsyncStorage.setItem('token', token);
-    await AsyncStorage.setItem('usuario', JSON.stringify(userData));
+    await AsyncStorage.setItem('userData', JSON.stringify(userData));
     console.log('✅ Dados salvos com sucesso no auth');
     
     // Verificar se salvou
     const savedToken = await AsyncStorage.getItem('token');
-    const savedUser = await AsyncStorage.getItem('usuario');
+    const savedUser = await AsyncStorage.getItem('userData');
     
     if (savedToken && savedUser) {
       console.log('✅ Verificação: Dados confirmados');

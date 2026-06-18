@@ -23,6 +23,7 @@ function CustomDrawerContent(props: any) {
   const carregarUsuario = async () => {
     const data = await getUserData();
     setUserData(data);
+    console.log('📱 Dados do usuário no drawer:', data);
   };
 
   const handleLogout = async () => {
@@ -36,7 +37,9 @@ function CustomDrawerContent(props: any) {
             text: 'Sair',
             style: 'destructive',
             onPress: async () => {
-              props.navigation.closeDrawer();
+              if (props.navigation) {
+                props.navigation.closeDrawer();
+              }
               const logoutSuccess = await logout();
               
               if (logoutSuccess) {
@@ -57,10 +60,8 @@ function CustomDrawerContent(props: any) {
     }
   };
 
-  // Não mostra drawer na tela de login e cadastro
-  if (pathname === '/login' || pathname === '/RegisterScreen') return null;
+  if (pathname === '/login' || pathname === '/RegisterScreen' || pathname === '/recuperarSenha') return null;
 
-  // Função para obter a URL completa da foto
   const getFotoUrl = (fotoPath: string | null): string | null => {
     if (!fotoPath) return null;
     if (fotoPath.startsWith('http')) return fotoPath;
@@ -69,18 +70,39 @@ function CustomDrawerContent(props: any) {
 
   const fotoUrl = userData?.foto ? getFotoUrl(userData.foto) : null;
 
-  // Menu items personalizados
+  const getTipoUsuarioDescricao = (tipo: number): string => {
+    return tipo === 1 ? 'Médico' : 'Paciente';
+  };
+
+  const getTipoUsuarioIcon = (tipo: number): string => {
+    return tipo === 1 ? 'doctor' : 'account';
+  };
+
+  const getTipoUsuarioColor = (tipo: number): string => {
+    return tipo === 1 ? '#2196F3' : '#4CAF50';
+  };
+
   const menuItems: { label: string; icon: string; route: Href }[] = [
     { label: 'Home', icon: 'home', route: '/(tabs)' },
     { label: 'Sobre', icon: 'information', route: '/sobre' },
   ];
+
+  const isAdmin = userData?.tipo_usuario === 1;
+
+  const navigateTo = (route: string) => {
+    if (props.navigation) {
+      props.navigation.closeDrawer();
+    }
+    setTimeout(() => {
+      router.push(route as Href);
+    }, 200);
+  };
 
   return (
     <DrawerContentScrollView 
       {...props} 
       contentContainerStyle={styles.drawerContainer}
     >
-      {/* Header com fundo vermelho igual às telas */}
       <View style={styles.drawerHeader}>
         <View style={styles.avatarContainer}>
           {fotoUrl ? (
@@ -92,13 +114,33 @@ function CustomDrawerContent(props: any) {
               }}
             />
           ) : (
-            <MaterialCommunityIcons name="account" size={50} color="#8B0000" />
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarFallbackText}>
+                {userData?.nome_completo?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
           )}
         </View>
         
         <Text style={styles.userName}>
           {userData?.nome_completo || userData?.name || 'Usuário'}
         </Text>
+        
+        {userData?.tipo_usuario !== undefined && (
+          <View style={[
+            styles.userTypeBadge,
+            { backgroundColor: getTipoUsuarioColor(userData.tipo_usuario) }
+          ]}>
+            <MaterialCommunityIcons 
+              name={getTipoUsuarioIcon(userData.tipo_usuario) as any} 
+              color="#FFFFFF" 
+              size={16} 
+            />
+            <Text style={styles.userTypeText}>
+              {getTipoUsuarioDescricao(userData.tipo_usuario)}
+            </Text>
+          </View>
+        )}
         
         <View style={styles.userInfoContainer}>
           <View style={styles.userInfoRow}>
@@ -116,16 +158,12 @@ function CustomDrawerContent(props: any) {
         </View>
       </View>
       
-      {/* Itens do Menu */}
       <View style={styles.drawerItems}>
         {menuItems.map((item) => (
           <TouchableOpacity
             key={item.route.toString()}
             style={styles.menuItem}
-            onPress={() => {
-              router.push(item.route);
-              props.navigation.closeDrawer();
-            }}
+            onPress={() => navigateTo(item.route.toString())}
           >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name={item.icon as any} size={24} color="#8B0000" />
@@ -133,9 +171,44 @@ function CustomDrawerContent(props: any) {
             <Text style={styles.menuItemLabel}>{item.label}</Text>
           </TouchableOpacity>
         ))}
+
+        {isAdmin && (
+          <>
+            <View style={styles.divider} />
+            
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateTo('/RegisterScreen')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#E8F5E9' }]}>
+                <MaterialCommunityIcons name="account-plus" size={24} color="#2E7D32" />
+              </View>
+              <Text style={styles.menuItemLabel}>Cadastrar Usuário</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateTo('/admin')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#FFF3E0' }]}>
+                <MaterialCommunityIcons name="shield-account" size={24} color="#E65100" />
+              </View>
+              <Text style={styles.menuItemLabel}>Admin</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateTo('/recuperarSenha')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#FFF3E0' }]}>
+                <MaterialCommunityIcons name="key" size={24} color="#E65100" />
+              </View>
+              <Text style={styles.menuItemLabel}>Recuperar Senha</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
       
-      {/* Botão Sair */}
       <View style={styles.logoutButton}>
         <TouchableOpacity
           style={styles.logoutItem}
@@ -149,6 +222,61 @@ function CustomDrawerContent(props: any) {
       </View>
     </DrawerContentScrollView>
   );
+}
+
+function AdminRouteGuard({ children }: { children: React.ReactNode }) {
+  const [userData, setUserData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    verificarAcesso();
+  }, []);
+
+  const verificarAcesso = async () => {
+    try {
+      const data = await getUserData();
+      setUserData(data);
+      console.log('🔐 Verificando acesso admin...');
+      console.log('📌 Tipo usuário:', data?.tipo_usuario);
+      
+      if (data?.tipo_usuario !== 1) {
+        console.log('🚫 Acesso negado!');
+        Alert.alert(
+          'Acesso Negado',
+          'Esta área é restrita para médicos.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                router.replace('/(tabs)');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('❌ Erro ao verificar acesso:', error);
+      router.replace('/(tabs)');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B0000" />
+        <Text style={styles.loadingText}>Verificando acesso...</Text>
+      </View>
+    );
+  }
+
+  if (userData?.tipo_usuario === 1) {
+    return <>{children}</>;
+  }
+
+  return null;
 }
 
 export default function RootLayout() {
@@ -173,9 +301,10 @@ export default function RootLayout() {
     verificarAutenticacao();
   }, []);
 
+  // 🔥 IMPORTANTE: Verificar sempre que a rota mudar
   useEffect(() => {
     verificarAutenticacao();
-  }, [pathname, verificarAutenticacao]);
+  }, [pathname]);
 
   if (isLoading) {
     return (
@@ -188,7 +317,10 @@ export default function RootLayout() {
     );
   }
 
-  if (!isAuthenticatedState && pathname !== '/login' && pathname !== '/RegisterScreen') {
+  const publicRoutes = ['/login', '/RegisterScreen', '/recuperarSenha'];
+
+  // 🔥 REGRA 1: Não logado e em rota privada → vai pro login
+  if (!isAuthenticatedState && !publicRoutes.includes(pathname)) {
     console.log('🚀 Redirecionando para login...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -197,8 +329,9 @@ export default function RootLayout() {
     );
   }
 
-  if (isAuthenticatedState && pathname === '/login') {
-    console.log('🚀 Usuário já logado, redirecionando para home...');
+  // 🔥 REGRA 2: Logado e em rota pública → vai pra home
+  if (isAuthenticatedState && publicRoutes.includes(pathname)) {
+    console.log('🚀 Usuário logado, redirecionando para home...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Redirect href="/(tabs)" />
@@ -206,6 +339,30 @@ export default function RootLayout() {
     );
   }
 
+  // 🔥 REGRA 3: Rota Admin
+  if (pathname === '/admin') {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AdminRouteGuard>
+          <Drawer
+            drawerContent={(props) => <CustomDrawerContent {...props} />}
+            screenOptions={{
+              headerShown: false,
+              drawerStyle: { 
+                width: '85%',
+                backgroundColor: '#FFF',
+              },
+              swipeEnabled: true,
+            }}
+          >
+            <Drawer.Screen name="admin" options={{ title: 'Admin' }} />
+          </Drawer>
+        </AdminRouteGuard>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // 🔥 REGRA 4: Rotas principais com Drawer
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ExamesProvider>
@@ -224,6 +381,7 @@ export default function RootLayout() {
           <Drawer.Screen name="sobre" options={{ title: 'Sobre' }} />
           <Drawer.Screen name="login" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="RegisterScreen" options={{ drawerItemStyle: { display: 'none' } }} />
+          <Drawer.Screen name="recuperarSenha" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="index" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="admin" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="modal" options={{ drawerItemStyle: { display: 'none' } }} />
@@ -239,7 +397,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
   },
-  // HEADER VERMELHO IGUAL ÀS TELAS
   drawerHeader: {
     backgroundColor: '#8B0000',
     paddingVertical: 30,
@@ -272,12 +429,40 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     resizeMode: 'cover',
   },
+  avatarFallback: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFD700',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#8B0000',
+  },
   userName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFF',
     textAlign: 'center',
     marginBottom: 5,
+  },
+  userTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginTop: 5,
+    marginBottom: 10,
+    gap: 6,
+  },
+  userTypeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   userInfoContainer: {
     width: '100%',
@@ -296,7 +481,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
   },
-  // ITENS DO MENU
   drawerItems: { 
     flex: 1,
     paddingTop: 5,
@@ -330,7 +514,12 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  // BOTÃO SAIR
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginVertical: 10,
+    marginHorizontal: 20,
+  },
   logoutButton: {
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',

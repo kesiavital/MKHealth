@@ -82,7 +82,7 @@ module.exports = {
       console.log('📝 Body keys:', Object.keys(req.body));
       console.log('📝 File recebido:', req.file ? 'SIM - ' + req.file.filename : 'NÃO');
       
-      const { nome_completo, email, cpf, senha } = req.body;
+      const { nome_completo, email, cpf, senha, tipo_usuario } = req.body;
 
       console.log('\n🆔 ====== CPF RECEBIDO ======');
       console.log('🆔 Valor:', cpf);
@@ -91,6 +91,12 @@ module.exports = {
       console.log('🆔 Caracteres (códigos):', cpf?.split('').map(c => c.charCodeAt(0)));
       console.log('🆔 Caracteres (visuais):', cpf?.split('').map(c => `'${c}'`));
       console.log('🆔 ============================\n');
+
+      // LOG DO TIPO USUÁRIO RECEBIDO
+      console.log('\n👤 ====== TIPO USUÁRIO RECEBIDO ======');
+      console.log('📌 tipo_usuario:', tipo_usuario);
+      console.log('📌 Tipo do dado:', typeof tipo_usuario);
+      console.log('👤 =====================================\n');
 
       if (!nome_completo || !email || !cpf || !senha) {
         console.log('❌ Campos obrigatórios faltando');
@@ -135,22 +141,39 @@ module.exports = {
         return res.status(409).json({ erro: "CPF já cadastrado" });
       }
 
+      // PROCESSAR TIPO USUÁRIO
+      let tipoUsuarioFinal = 0; // padrão: paciente
+      if (tipo_usuario !== undefined && tipo_usuario !== null) {
+        const tipoNum = parseInt(tipo_usuario);
+        if (tipoNum === 0 || tipoNum === 1) {
+          tipoUsuarioFinal = tipoNum;
+        } else {
+          console.log('⚠️ Tipo de usuário inválido:', tipo_usuario, 'usando padrão 0 (Paciente)');
+        }
+      } else {
+        console.log('⚠️ Tipo de usuário não enviado, usando padrão 0 (Paciente)');
+      }
+
       console.log('\n💾 ====== CRIANDO USUÁRIO ======');
       console.log('  - nome_completo:', nome_completo.trim());
       console.log('  - email:', email.trim().toLowerCase());
       console.log('  - cpf:', cpfLimpo);
       console.log('  - cpf tamanho:', cpfLimpo.length);
+      console.log('  - tipo_usuario:', tipoUsuarioFinal);
+      console.log('  - tipo_usuario (descrição):', tipoUsuarioFinal === 0 ? 'Paciente' : 'Médico');
 
       const usuario = await Usuario.create({
         nome_completo: nome_completo.trim(),
         email: email.trim().toLowerCase(),
         cpf: cpfLimpo,
         senha_hash: senhaHash,
-        foto: foto
+        foto: foto,
+        tipo_usuario: tipoUsuarioFinal
       });
 
       console.log('\n✅ Usuário criado com ID:', usuario.id);
       console.log('✅ CPF salvo:', usuario.cpf);
+      console.log('✅ Tipo usuário salvo:', usuario.tipo_usuario);
       console.log('📝 ========== FIM CADASTRO ==========\n');
 
       return res.status(201).json({
@@ -161,7 +184,8 @@ module.exports = {
           nome_completo: usuario.nome_completo,
           email: usuario.email,
           cpf: formatarCPF(usuario.cpf),
-          foto: usuario.foto
+          foto: usuario.foto,
+          tipo_usuario: usuario.tipo_usuario
         }
       });
 
@@ -230,14 +254,13 @@ module.exports = {
         console.log('🆔 CPF limpo:', cpfLimpo);
         console.log('🆔 Tamanho do CPF limpo:', cpfLimpo.length);
         
-        // Listar todos os usuários
         console.log('\n📋 ====== USUÁRIOS NO BANCO ======');
         const todosUsuarios = await Usuario.findAll({
-          attributes: ['id', 'nome_completo', 'email', 'cpf']
+          attributes: ['id', 'nome_completo', 'email', 'cpf', 'tipo_usuario']
         });
         console.log(`📋 Total: ${todosUsuarios.length} usuários`);
         todosUsuarios.forEach(u => {
-          console.log(`📋 ID: ${u.id}, Nome: ${u.nome_completo}, CPF: '${u.cpf}' (tamanho: ${u.cpf?.length})`);
+          console.log(`📋 ID: ${u.id}, Nome: ${u.nome_completo}, CPF: '${u.cpf}' (tamanho: ${u.cpf?.length}), Tipo: ${u.tipo_usuario}`);
         });
         console.log('📋 ================================\n');
         
@@ -268,6 +291,7 @@ module.exports = {
       console.log('  - Nome:', usuario.nome_completo);
       console.log('  - Email:', usuario.email);
       console.log('  - CPF:', usuario.cpf);
+      console.log('  - Tipo:', usuario.tipo_usuario);
 
       console.log('\n🔐 Verificando senha...');
       const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
@@ -282,7 +306,8 @@ module.exports = {
         { 
           id: usuario.id, 
           email: usuario.email,
-          nome_completo: usuario.nome_completo 
+          nome_completo: usuario.nome_completo,
+          tipo_usuario: usuario.tipo_usuario
         },
         process.env.JWT_SECRET || "CHAVE_SECRETA_DESENVOLVIMENTO",
         { expiresIn: "7d" }
@@ -300,7 +325,8 @@ module.exports = {
           nome_completo: usuario.nome_completo,
           email: usuario.email,
           cpf: formatarCPF(usuario.cpf),
-          foto: usuario.foto
+          foto: usuario.foto,
+          tipo_usuario: usuario.tipo_usuario
         },
         token
       });
@@ -320,7 +346,7 @@ module.exports = {
     try {
       console.log('\n📋 ====== VERIFICANDO USUÁRIOS ======');
       const usuarios = await Usuario.findAll({
-        attributes: ['id', 'nome_completo', 'email', 'cpf', 'createdAt']
+        attributes: ['id', 'nome_completo', 'email', 'cpf', 'tipo_usuario', 'createdAt']
       });
       
       console.log(`📋 Total: ${usuarios.length} usuários`);
@@ -330,11 +356,13 @@ module.exports = {
         email: u.email,
         cpf: u.cpf,
         cpf_tamanho: u.cpf?.length,
+        tipo_usuario: u.tipo_usuario,
+        tipo_descricao: u.tipo_usuario === 0 ? 'Paciente' : 'Médico',
         criado_em: u.createdAt
       }));
       
       usuariosFormatados.forEach(u => {
-        console.log(`📋 ID: ${u.id}, Nome: ${u.nome}, CPF: '${u.cpf}' (${u.cpf_tamanho} caracteres)`);
+        console.log(`📋 ID: ${u.id}, Nome: ${u.nome}, CPF: '${u.cpf}' (${u.cpf_tamanho} caracteres), Tipo: ${u.tipo_descricao}`);
       });
       console.log('📋 ==================================\n');
       
@@ -361,7 +389,9 @@ module.exports = {
         nome_completo: u.nome_completo,
         email: u.email,
         cpf: formatarCPF(u.cpf),
-        foto: u.foto
+        foto: u.foto,
+        tipo_usuario: u.tipo_usuario,
+        tipo_descricao: u.tipo_usuario === 0 ? 'Paciente' : 'Médico'
       }));
       
       return res.json(usuariosFormatados);
@@ -387,7 +417,9 @@ module.exports = {
         nome_completo: usuario.nome_completo,
         email: usuario.email,
         cpf: formatarCPF(usuario.cpf),
-        foto: usuario.foto
+        foto: usuario.foto,
+        tipo_usuario: usuario.tipo_usuario,
+        tipo_descricao: usuario.tipo_usuario === 0 ? 'Paciente' : 'Médico'
       });
     } catch (error) {
       console.error('❌ Erro ao buscar por ID:', error);
@@ -431,7 +463,9 @@ module.exports = {
           nome_completo: usuario.nome_completo,
           email: usuario.email,
           cpf: formatarCPF(usuario.cpf),
-          foto: novaFoto
+          foto: novaFoto,
+          tipo_usuario: usuario.tipo_usuario,
+          tipo_descricao: usuario.tipo_usuario === 0 ? 'Paciente' : 'Médico'
         }
       });
 

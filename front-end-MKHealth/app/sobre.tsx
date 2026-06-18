@@ -35,7 +35,7 @@ export default function SobreNosScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sobre Nós</Text>
         <Image 
-          source={require('./img/logomk.png')} 
+          source={require('../assets/images/logomk.png')} 
           style={styles.headerLogo}
         />
       </View>
@@ -47,7 +47,7 @@ export default function SobreNosScreen() {
         {/* Logo e Missão */}
         <View style={styles.logoContainer}>
           <Image 
-            source={require('./img/logomk.png')} 
+            source={require('../assets/images/logomk.png')} 
             style={styles.mainLogo}
           />
           <Text style={styles.appName}>MK Health</Text>

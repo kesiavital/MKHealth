@@ -1,3 +1,4 @@
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BASE_URL, USUARIOS_URL } from '../service/api';
+import { BASE_URL, USUARIOS_URL } from '../../service/api';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,7 @@ export default function RegisterScreen() {
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [tipoUsuario, setTipoUsuario] = useState<string>('0');
   
   // Estados para mostrar/ocultar senha
   const [showPassword, setShowPassword] = useState(false);
@@ -170,17 +172,44 @@ export default function RegisterScreen() {
     return emailRegex.test(email);
   };
 
+  // ========== FUNÇÃO PARA MOSTRAR ALERT COM OS DADOS ==========
+  const mostrarDadosParaDebug = () => {
+    Alert.alert(
+      '🔍 DADOS ATUAIS',
+      `📌 tipoUsuario: "${tipoUsuario}"\n` +
+      `📌 Tipo: ${typeof tipoUsuario}\n` +
+      `📌 Comprimento: ${tipoUsuario?.length}\n` +
+      `📌 É "0"? ${tipoUsuario === '0'}\n` +
+      `📌 É "1"? ${tipoUsuario === '1'}\n` +
+      `📌 Convertido para número: ${Number(tipoUsuario)}`,
+      [{ text: 'OK' }]
+    );
+  };
+
   // ========== FUNÇÃO PRINCIPAL DE CADASTRO ==========
 
   const handleRegister = async (): Promise<void> => {
     console.log('🚀 ========== INICIANDO CADASTRO ==========');
-    console.log('📝 Dados do formulário:', {
-      name: name.trim(),
-      email: email.trim(),
-      cpf: cpf,
-      hasFoto: !!foto
-    });
+    
+    // ====== ALERT COM OS DADOS ATUAIS ======
+    Alert.alert(
+      '📋 DADOS DO FORMULÁRIO',
+      `Nome: ${name.trim() || '(vazio)'}\n` +
+      `Email: ${email.trim() || '(vazio)'}\n` +
+      `CPF: ${cpf || '(vazio)'}\n` +
+      `Tipo Usuário: "${tipoUsuario}" (${typeof tipoUsuario})\n` +
+      `Senha: ${password ? '***' : '(vazio)'}\n` +
+      `Foto: ${foto ? 'SIM' : 'NÃO'}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Continuar', onPress: continuarCadastro }
+      ]
+    );
+  };
 
+  const continuarCadastro = async (): Promise<void> => {
+    console.log('✅ Continuando com o cadastro...');
+    
     // Validações
     if (!name.trim()) {
       Alert.alert('Erro', 'Por favor, digite seu nome completo.');
@@ -233,18 +262,35 @@ export default function RegisterScreen() {
       formData.append('email', email.trim().toLowerCase());
       formData.append('cpf', cpfLimpo);
       formData.append('senha', password);
+      
+      // ====== CONVERSÃO DO TIPO USUÁRIO ======
+      console.log('\n🔄 ====== CONVERTENDO TIPO USUÁRIO ======');
+      console.log('📌 Valor original (string):', tipoUsuario);
+      
+      const tipoNumero = Number(tipoUsuario);
+      console.log('📌 Number(tipoUsuario):', tipoNumero);
+      
+      let tipoFinal = 0;
+      if (!isNaN(tipoNumero) && (tipoNumero === 0 || tipoNumero === 1)) {
+        tipoFinal = tipoNumero;
+        console.log('✅ Tipo final (número):', tipoFinal);
+      } else {
+        console.log('⚠️ Valor inválido, usando padrão 0');
+        tipoFinal = 0;
+      }
+      
+      console.log('✅ Tipo final que será enviado:', tipoFinal);
+      formData.append('tipo_usuario', String(tipoFinal));
 
-      // 🔥 CORREÇÃO: Adicionar foto no formato que o React Native entende
+      // Adicionar foto no formato que o React Native entende
       if (foto) {
         console.log('📸 Processando foto para upload...');
         console.log('📸 URI da foto:', foto);
         
         try {
-          // Pega a extensão do arquivo a partir da URI
           const uriParts = foto.split('.');
           const fileType = uriParts[uriParts.length - 1] || 'jpg';
           
-          // Cria o objeto de arquivo no formato que o React Native entende
           // @ts-ignore - O React Native aceita este formato
           formData.append('foto', {
             uri: foto,
@@ -256,24 +302,37 @@ export default function RegisterScreen() {
           console.log('📸 Tipo:', fileType);
         } catch (fotoError) {
           console.error('❌ Erro ao processar foto:', fotoError);
-          // Continua mesmo sem foto
         }
       }
 
-      // Log dos campos do FormData
-      console.log('📦 Campos do FormData:');
+      // ====== LOG DO FORMDATA ======
+      console.log('\n📦 ====== CAMPOS DO FORMDATA ======');
+      const campos: string[] = [];
       // @ts-ignore
       for (let pair of formData.entries()) {
         const key = pair[0];
         const value = pair[1];
         if (key === 'senha') {
           console.log(`  - ${key}: ****`);
+          campos.push(`${key}: ****`);
         } else if (key === 'foto') {
-          console.log(`  - ${key}: [ARQUIVO] - ${typeof value === 'object' ? JSON.stringify(value) : 'File'}`);
+          console.log(`  - ${key}: [ARQUIVO]`);
+          campos.push(`${key}: [ARQUIVO]`);
         } else {
-          console.log(`  - ${key}: ${value}`);
+          console.log(`  - ${key}: '${value}' (${typeof value})`);
+          campos.push(`${key}: '${value}'`);
         }
       }
+      console.log('📦 ================================\n');
+
+      // ====== ALERT COM O QUE VAI SER ENVIADO ======
+      Alert.alert(
+        '📤 ENVIANDO DADOS',
+        `URL: ${url}\n\n` +
+        `Campos:\n${campos.join('\n')}\n\n` +
+        `TIPO USUÁRIO: "${String(tipoFinal)}" (${typeof String(tipoFinal)})`,
+        [{ text: 'OK, enviar' }]
+      );
 
       console.log('📡 Enviando requisição POST para:', url);
 
@@ -287,7 +346,6 @@ export default function RegisterScreen() {
 
       console.log('📡 Status da resposta:', response.status);
 
-      // Ler resposta como texto primeiro
       const responseText = await response.text();
       console.log('📡 Resposta bruta:', responseText.substring(0, 500));
 
@@ -300,7 +358,6 @@ export default function RegisterScreen() {
         throw new Error(`Resposta inválida do servidor: ${responseText.substring(0, 100)}`);
       }
 
-      // Tratar erros específicos
       if (response.status === 400) {
         Alert.alert('Erro de Validação', data.erro || 'Dados inválidos');
         return;
@@ -315,13 +372,17 @@ export default function RegisterScreen() {
         throw new Error(data.erro || `Erro ${response.status}: ${response.statusText}`);
       }
 
-      // Sucesso!
       console.log('✅ Cadastro realizado com sucesso!');
-      console.log('✅ Foto salva:', data.usuario?.foto || 'Sem foto');
+      console.log('✅ Tipo usuário enviado:', tipoFinal);
+      console.log('✅ Tipo usuário retornado do banco:', data.usuario?.tipo_usuario);
       
+      const tipoDescricao = data.usuario?.tipo_usuario === 0 ? 'Paciente' : 'Médico';
       Alert.alert(
-        'Sucesso!', 
-        data.mensagem || 'Cadastro realizado com sucesso!',
+        '✅ Sucesso!', 
+        `Cadastro realizado!\n\n` +
+        `Nome: ${data.usuario?.nome_completo}\n` +
+        `Email: ${data.usuario?.email}\n` +
+        `Tipo: ${tipoDescricao} (${data.usuario?.tipo_usuario})`,
         [
           {
             text: 'OK',
@@ -338,21 +399,17 @@ export default function RegisterScreen() {
       console.error('❌ Mensagem:', error.message);
       console.error('❌ Stack:', error.stack);
       
-      if (error.message === 'Network request failed' || error.message.includes('Network')) {
-        Alert.alert(
-          'Erro de Conexão',
-          `Não foi possível conectar ao servidor.\n\nURL tentada:\n${USUARIOS_URL}/cadastro\n\nVerifique:\n• Backend está rodando (npm start)\n• IP correto: ${BASE_URL}\n• Mesma rede Wi-Fi\n• Firewall não está bloqueando`
-        );
-      } else {
-        Alert.alert('Erro', error.message || 'Erro ao realizar cadastro.');
-      }
+      Alert.alert(
+        '❌ Erro',
+        `Erro ao cadastrar:\n\n${error.message}`,
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
       console.log('🏁 ========== CADASTRO FINALIZADO ==========');
     }
   };
 
-  // Função para navegar para o login
   const navigateToLogin = () => {
     console.log('🔵 Navegando para Login...');
     try {
@@ -379,7 +436,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.logoContainer}>
           <Image
-            source={require('./img/logomk.png')}
+            source={require('../../assets/images/logomk.png')}
             style={styles.logo}
           />
         </View>
@@ -446,6 +503,44 @@ export default function RegisterScreen() {
             maxLength={14}
             editable={!loading}
           />
+
+          {/* TIPO DE USUÁRIO */}
+          <Text style={styles.label}>Tipo de Usuário</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={tipoUsuario}
+              onValueChange={(itemValue) => {
+                console.log('\n📌 ====== PICKER MUDOU ======');
+                console.log('📌 Novo valor:', itemValue);
+                console.log('📌 Tipo do valor:', typeof itemValue);
+                setTipoUsuario(itemValue);
+                
+                // ALERT MOSTRANDO O VALOR SELECIONADO
+                Alert.alert(
+                  '📌 TIPO SELECIONADO',
+                  `Valor: "${itemValue}"\n` +
+                  `Tipo: ${typeof itemValue}\n` +
+                  `Descrição: ${itemValue === '0' ? 'Paciente' : 'Médico'}`,
+                  [{ text: 'OK' }]
+                );
+              }}
+              style={styles.picker}
+              enabled={!loading}
+              dropdownIconColor="#8B0000"
+            >
+              <Picker.Item label="👤 Paciente" value="0" />
+              <Picker.Item label="👨‍⚕️ Médico" value="1" />
+            </Picker>
+          </View>
+
+          {/* Botão para mostrar dados atuais */}
+          <TouchableOpacity
+            style={[styles.debugButton]}
+            onPress={mostrarDadosParaDebug}
+            disabled={loading}
+          >
+            <Text style={styles.debugButtonText}>🔍 Ver Dados Atuais</Text>
+          </TouchableOpacity>
 
           {/* SENHA */}
           <Text style={styles.label}>Senha</Text>
@@ -626,6 +721,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     fontSize: 15,
+  },
+  pickerContainer: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 15,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    color: '#333',
+  },
+  debugButton: {
+    backgroundColor: '#2196F3',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   passwordContainer: {
     flexDirection: 'row',
