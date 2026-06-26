@@ -8,17 +8,17 @@ import { Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 export default function SobreNosScreen() {
   const teamMembers = [
     {
-      nome: 'Ana Silva',
+      nome: 'Kesia Vital',
       papel: 'Desenvolvedora Full Stack',
       icon: 'account-circle',
     },
     {
-      nome: 'Maria Santos',
+      nome: 'Maria Clara',
       papel: 'UX/UI Designer',
       icon: 'account-circle',
     },
     {
-      nome: 'Juliana Oliveira',
+      nome: 'Marcella Salles',
       papel: 'Desenvolvedora Backend',
       icon: 'account-circle',
     },
