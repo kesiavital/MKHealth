@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
+import { STORAGE_KEYS } from '../../service/auth';
 
 const API_URL = `http://${IP}:3000/api/exames`;
 
@@ -96,13 +97,13 @@ export default function ExamesScreen() {
   const [listaExames, setListaExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<number | null>(null);
-  
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingExame, setEditingExame] = useState<Exame | null>(null);
   const [saving, setSaving] = useState(false);
   const [newPdfFile, setNewPdfFile] = useState<any>(null);
   const [removerPdf, setRemoverPdf] = useState(false);
-  
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTipoSelect, setShowTipoSelect] = useState(false);
   const [showMedicoSelect, setShowMedicoSelect] = useState(false);
@@ -110,7 +111,7 @@ export default function ExamesScreen() {
   const [tipoCustom, setTipoCustom] = useState(false);
   const [medicoCustom, setMedicoCustom] = useState(false);
   const [laboratorioCustom, setLaboratorioCustom] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     paciente_nome: '',
     tipo_exame: '',
@@ -136,7 +137,7 @@ export default function ExamesScreen() {
 
   const carregarUsuario = async () => {
     try {
-      const userDataString = await AsyncStorage.getItem('userData');
+      const userDataString = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       if (userDataString) {
         const data = JSON.parse(userDataString);
         setUserData(data);
@@ -174,7 +175,7 @@ export default function ExamesScreen() {
     setModalMensagem(`Deseja abrir o PDF do exame de ${exame.paciente_nome}?`);
     setModalBotaoTexto('Abrir PDF');
     setModalAcao(() => () => visualizarPDF(exame));
-    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => {} });
+    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => { } });
     setModalVisibleGlobal(true);
   };
 
@@ -185,33 +186,92 @@ export default function ExamesScreen() {
     }
   };
 
+  // 🔥 FUNÇÃO PARA FAZER REQUISIÇÕES COM TOKEN
+  const fetchWithToken = async (url: string, options: any = {}) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+
+    if (!token) {
+      throw new Error('Token não encontrado');
+    }
+
+    const headers: any = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+    };
+
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    return response;
+  };
+
   const carregarExames = async () => {
     setLoading(true);
     try {
-      const response = await fetch(API_URL);
+      console.log('📋 Carregando exames...');
+
+      const response = await fetchWithToken(API_URL);
       const data = await response.json();
-      
+
+      console.log('📋 Resposta:', Array.isArray(data) ? `Array com ${data.length} itens` : typeof data);
+
       if (!userData) {
         await carregarUsuario();
         return;
       }
 
-      let examesFiltrados = data;
+      let examesData: Exame[] = [];
+      if (Array.isArray(data)) {
+        examesData = data;
+      } else if (data && data.exames && Array.isArray(data.exames)) {
+        examesData = data.exames;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        examesData = data.data;
+      } else {
+        console.log('⚠️ Estrutura de dados não reconhecida:', data);
+        examesData = [];
+      }
+
+      let examesFiltrados = examesData;
       if (!isAdmin) {
         const nomePaciente = userData.nome_completo?.toLowerCase().trim();
-        examesFiltrados = data.filter((exame: Exame) => 
-          exame.paciente_nome?.toLowerCase().trim() === nomePaciente ||
-          exame.paciente_cpf === userData.cpf
-        );
+        const cpfPaciente = userData.cpf?.replace(/\D/g, '');
+
+        examesFiltrados = examesData.filter((exame: Exame) => {
+          const nomeExame = exame.paciente_nome?.toLowerCase().trim();
+          const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
+          return nomeExame === nomePaciente || cpfExame === cpfPaciente;
+        });
         console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
       } else {
-        console.log(`📱 Médico - ${data.length} exames encontrados`);
+        console.log(`📱 Admin - ${examesFiltrados.length} exames encontrados`);
       }
-      
+
       setListaExames(examesFiltrados);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao carregar exames:', error);
-      abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
+
+      if (error.message.includes('Sessão expirada')) {
+        abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+      } else {
+        abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
+      }
     } finally {
       setLoading(false);
     }
@@ -262,7 +322,7 @@ export default function ExamesScreen() {
       setRemoverPdf(true);
       setNewPdfFile(null);
     });
-    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => {} });
+    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => { } });
     setModalExamePdf(null);
     setModalVisibleGlobal(true);
   };
@@ -302,7 +362,7 @@ export default function ExamesScreen() {
       formDataToSend.append('data_exame', formData.data_exame);
       formDataToSend.append('medico_solicitante', formData.medico_solicitante.trim());
       formDataToSend.append('laboratorio', formData.laboratorio.trim());
-      
+
       if (formData.resultados) {
         formDataToSend.append('resultados', formData.resultados);
       }
@@ -322,9 +382,8 @@ export default function ExamesScreen() {
         formDataToSend.append('remover_pdf', 'true');
       }
 
-      const response = await fetch(`${API_URL}/${editingExame?.id}`, {
+      const response = await fetchWithToken(`${API_URL}/${editingExame?.id}`, {
         method: 'PUT',
-        headers: { 'Accept': 'application/json' },
         body: formDataToSend,
       });
 
@@ -338,9 +397,15 @@ export default function ExamesScreen() {
         setModalVisible(false);
         carregarExames();
       });
-      
+
     } catch (error: any) {
-      abrirModal('erro', '❌ Erro', error.message || 'Erro ao atualizar');
+      console.error('❌ Erro ao salvar:', error);
+
+      if (error.message.includes('Sessão expirada')) {
+        abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+      } else {
+        abrirModal('erro', '❌ Erro', error.message || 'Erro ao atualizar');
+      }
     } finally {
       setSaving(false);
     }
@@ -353,17 +418,37 @@ export default function ExamesScreen() {
     setModalBotaoTexto('Excluir');
     setModalAcao(() => async () => {
       try {
-        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        const response = await fetchWithToken(`${API_URL}/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.erro || 'Erro ao deletar');
+        }
+
         abrirModal('sucesso', '✅ Sucesso', 'Exame deletado com sucesso!', 'OK', () => carregarExames());
-      } catch (error) {
-        abrirModal('erro', '❌ Erro', 'Não foi possível deletar o exame');
+      } catch (error: any) {
+        console.error('❌ Erro ao deletar:', error);
+
+        if (error.message.includes('Sessão expirada')) {
+          abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        } else {
+          abrirModal('erro', '❌ Erro', error.message || 'Não foi possível deletar o exame');
+        }
       }
     });
-    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => {} });
+    setModalBotaoSecundario({ texto: 'Cancelar', acao: () => { } });
     setModalExamePdf(null);
     setModalVisibleGlobal(true);
   };
 
+  // ============================================
+  // 🔥 FUNÇÃO VISUALIZAR PDF - CORRIGIDA
+  // ============================================
+  // ============================================
+  // 🔥 FUNÇÃO VISUALIZAR PDF - CORRIGIDA PARA ANDROID
+  // ============================================
   const visualizarPDF = async (exame: Exame) => {
     if (!exame.possui_pdf) {
       abrirModal('erro', '❌ Erro', 'Este exame não possui PDF');
@@ -371,31 +456,57 @@ export default function ExamesScreen() {
     }
 
     setOpeningId(exame.id);
-    
+
     try {
-      const pdfUrl = `http://${IP}:3000/api/exames/${exame.id}/visualizar`;
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+
+      if (!token) {
+        throw new Error('Token não encontrado');
+      }
+
+      // 🔥 CONSTRUIR URL COM TOKEN
+      const pdfUrl = `http://${IP}:3000/api/exames/${exame.id}/visualizar?token=${token}`;
       console.log('📄 Abrindo PDF:', pdfUrl);
-      
-      const checkResponse = await fetch(pdfUrl, { method: 'HEAD' });
-      console.log('Status da verificação:', checkResponse.status);
-      
-      if (!checkResponse.ok) {
-        throw new Error(`PDF não encontrado (Status: ${checkResponse.status})`);
-      }
-      
+
+      // 🔥 PARA ANDROID - Usar Linking em vez de IntentLauncher
       if (Platform.OS === 'android') {
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: pdfUrl,
-          type: 'application/pdf',
-          flags: 1,
-        });
+        // Verificar se o link pode ser aberto
+        const supported = await Linking.canOpenURL(pdfUrl);
+
+        if (supported) {
+          await Linking.openURL(pdfUrl);
+        } else {
+          // Tentar com IntentLauncher como fallback
+          try {
+            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+              data: pdfUrl,
+              type: 'application/pdf',
+              flags: 1,
+            });
+          } catch (intentError) {
+            console.error('❌ IntentLauncher falhou:', intentError);
+            // Fallback: abrir no navegador
+            await Linking.openURL(pdfUrl);
+          }
+        }
       } else {
-        await Linking.openURL(pdfUrl);
+        // iOS - usar Linking
+        const supported = await Linking.canOpenURL(pdfUrl);
+        if (supported) {
+          await Linking.openURL(pdfUrl);
+        } else {
+          throw new Error('Não foi possível abrir o PDF');
+        }
       }
-      
-    } catch (error) {
-      console.error('Erro ao abrir PDF:', error);
-      abrirModal('erro', '❌ Erro', `Não foi possível abrir o PDF.\n\nURL: ${API_URL}/${exame.id}/visualizar`);
+
+    } catch (error: any) {
+      console.error('❌ Erro ao abrir PDF:', error);
+
+      if (error.message.includes('Sessão expirada')) {
+        abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+      } else {
+        abrirModal('erro', '❌ Erro', error.message || 'Não foi possível abrir o PDF');
+      }
     } finally {
       setOpeningId(null);
     }
@@ -411,9 +522,9 @@ export default function ExamesScreen() {
     setModalMensagem(`O que deseja fazer com o exame de ${exame.paciente_nome}?`);
     setModalBotaoTexto('✏️ Editar');
     setModalAcao(() => () => editarExame(exame));
-    setModalBotaoSecundario({ 
-      texto: '🗑️ Excluir', 
-      acao: () => deletarExame(exame.id) 
+    setModalBotaoSecundario({
+      texto: '🗑️ Excluir',
+      acao: () => deletarExame(exame.id)
     });
     setModalExamePdf(null);
     setModalVisibleGlobal(true);
@@ -523,7 +634,7 @@ export default function ExamesScreen() {
         )}
 
         {item.possui_pdf && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.pdfButton}
             onPress={() => mostrarMenuPDF(item)}
             disabled={openingId === item.id}
@@ -561,7 +672,6 @@ export default function ExamesScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* 🔥 HEADER COM GRADIENTE E LOGO */}
         <LinearGradient
           colors={['#8B0000', '#A52A2A']}
           start={{ x: 0, y: 0 }}
@@ -611,7 +721,7 @@ export default function ExamesScreen() {
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
         >
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalOverlay}
           >
@@ -631,7 +741,7 @@ export default function ExamesScreen() {
                   onChangeText={(text) => setFormData({ ...formData, paciente_nome: text })}
                 />
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.selectButton}
                   onPress={() => setShowTipoSelect(true)}
                 >
@@ -639,7 +749,7 @@ export default function ExamesScreen() {
                   <MaterialCommunityIcons name="chevron-down" size={20} />
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.selectButton}
                   onPress={() => setShowDatePicker(true)}
                 >
@@ -647,7 +757,7 @@ export default function ExamesScreen() {
                   <MaterialCommunityIcons name="calendar" size={20} />
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.selectButton}
                   onPress={() => setShowMedicoSelect(true)}
                 >
@@ -655,7 +765,7 @@ export default function ExamesScreen() {
                   <MaterialCommunityIcons name="chevron-down" size={20} />
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.selectButton}
                   onPress={() => setShowLaboratorioSelect(true)}
                 >
@@ -681,7 +791,7 @@ export default function ExamesScreen() {
 
                 <View style={styles.pdfSection}>
                   <Text style={styles.pdfTitle}>PDF do Exame</Text>
-                  
+
                   {editingExame?.possui_pdf && !removerPdf && !newPdfFile && (
                     <View style={styles.currentPdf}>
                       <Text>📄 {editingExame.pdf_nome}</Text>
@@ -698,7 +808,7 @@ export default function ExamesScreen() {
                   )}
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.saveButton}
                   onPress={salvarAlteracoes}
                   disabled={saving}
@@ -805,7 +915,7 @@ export default function ExamesScreen() {
           />
         )}
 
-        {/* 🔥 MODAL UNIVERSAL ESTILIZADO */}
+        {/* MODAL UNIVERSAL */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -887,26 +997,28 @@ export default function ExamesScreen() {
   );
 }
 
+// ============================================
+// STYLES
+// ============================================
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  container: { 
+  container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  centered: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  loadingText: { 
-    marginTop: 10, 
-    color: '#666' 
+  loadingText: {
+    marginTop: 10,
+    color: '#666'
   },
-  
-  // 🔥 HEADER COM GRADIENTE E LOGO
+
   header: {
     paddingVertical: 20,
     paddingHorizontal: 20,
@@ -946,296 +1058,291 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  listContainer: { 
+  listContainer: {
     padding: 16,
     paddingTop: 16,
   },
-  
-  // 🔥 CARDS
-  card: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 14, 
-    marginBottom: 16, 
+
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    marginBottom: 16,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
-    overflow: 'hidden' 
+    overflow: 'hidden'
   },
-  cardHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 14, 
-    backgroundColor: '#FFF5F5', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#FFE0E0' 
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    backgroundColor: '#FFF5F5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE0E0'
   },
-  pacienteInfo: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    flex: 1 
+  pacienteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1
   },
-  avatar: { 
-    width: 44, 
-    height: 44, 
-    borderRadius: 22, 
-    backgroundColor: '#8B0000', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#8B0000',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  avatarText: { 
-    color: '#FFF', 
-    fontSize: 18, 
-    fontWeight: 'bold' 
+  avatarText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold'
   },
-  pacienteDetails: { 
-    marginLeft: 12, 
-    flex: 1 
+  pacienteDetails: {
+    marginLeft: 12,
+    flex: 1
   },
-  pacienteNome: { 
-    fontSize: 15, 
-    fontWeight: 'bold', 
-    color: '#333' 
+  pacienteNome: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333'
   },
-  exameTipo: { 
-    fontSize: 12, 
-    color: '#8B0000', 
+  exameTipo: {
+    fontSize: 12,
+    color: '#8B0000',
     marginTop: 2,
     fontWeight: '500',
   },
-  cardContent: { 
-    padding: 14 
+  cardContent: {
+    padding: 14
   },
-  infoRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 8 
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
   },
-  infoLabel: { 
-    fontSize: 13, 
-    color: '#666', 
-    marginLeft: 8, 
-    marginRight: 8, 
-    fontWeight: '500' 
+  infoLabel: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 8,
+    marginRight: 8,
+    fontWeight: '500'
   },
-  infoValue: { 
-    fontSize: 13, 
-    color: '#333', 
-    flex: 1 
+  infoValue: {
+    fontSize: 13,
+    color: '#333',
+    flex: 1
   },
-  resultadosContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
-    marginTop: 8, 
-    padding: 10, 
-    backgroundColor: '#F8F9FA', 
-    borderRadius: 8 
+  resultadosContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8
   },
-  resultadosText: { 
-    fontSize: 13, 
-    color: '#333', 
-    marginLeft: 8, 
-    flex: 1 
+  resultadosText: {
+    fontSize: 13,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1
   },
-  observacoesContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
-    marginTop: 8, 
-    padding: 10, 
-    backgroundColor: '#FFF8E1', 
-    borderRadius: 8 
+  observacoesContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8
   },
-  observacoesText: { 
-    fontSize: 13, 
-    color: '#856404', 
-    marginLeft: 8, 
-    flex: 1 
+  observacoesText: {
+    fontSize: 13,
+    color: '#856404',
+    marginLeft: 8,
+    flex: 1
   },
-  pdfButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: '#8B0000', 
-    padding: 10, 
-    borderRadius: 8, 
-    marginTop: 12, 
-    gap: 8 
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8B0000',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8
   },
-  pdfButtonText: { 
-    fontSize: 13, 
-    fontWeight: 'bold', 
-    color: '#FFF' 
+  pdfButtonText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFF'
   },
-  cardFooter: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 10, 
-    backgroundColor: '#FAFAFA', 
-    borderTopWidth: 1, 
-    borderTopColor: '#F0F0F0', 
-    gap: 6 
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#FAFAFA',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: 6
   },
-  dataCriacao: { 
-    fontSize: 11, 
-    color: '#999' 
+  dataCriacao: {
+    fontSize: 11,
+    color: '#999'
   },
-  
-  // 🔥 EMPTY STATE
-  emptyContainer: { 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    paddingVertical: 60 
+
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60
   },
-  emptyTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#999', 
-    marginTop: 16 
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 16
   },
-  emptyText: { 
-    fontSize: 14, 
-    color: '#CCC', 
-    marginTop: 8, 
-    textAlign: 'center' 
+  emptyText: {
+    fontSize: 14,
+    color: '#CCC',
+    marginTop: 8,
+    textAlign: 'center'
   },
-  
-  // 🔥 MODAL DE EDIÇÃO
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'flex-end' 
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
   },
-  modalContainer: { 
-    backgroundColor: '#FFF', 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20, 
-    maxHeight: '90%' 
+  modalContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%'
   },
-  modalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#E0E0E0' 
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0'
   },
-  modalTitle: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
-    color: '#333' 
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333'
   },
-  modalContent: { 
-    padding: 20 
+  modalContent: {
+    padding: 20
   },
-  input: { 
-    borderWidth: 1, 
-    borderColor: '#E0E0E0', 
-    borderRadius: 10, 
-    padding: 12, 
-    marginBottom: 16, 
-    backgroundColor: '#F8F9FA' 
+  input: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#F8F9FA'
   },
-  textArea: { 
-    minHeight: 100, 
-    textAlignVertical: 'top' 
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top'
   },
-  selectButton: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: '#E0E0E0', 
-    borderRadius: 10, 
-    padding: 12, 
-    marginBottom: 16, 
-    backgroundColor: '#F8F9FA' 
+  selectButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#F8F9FA'
   },
-  pdfSection: { 
-    marginTop: 10, 
-    marginBottom: 20, 
-    paddingTop: 15, 
-    borderTopWidth: 1, 
-    borderTopColor: '#E0E0E0' 
+  pdfSection: {
+    marginTop: 10,
+    marginBottom: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0'
   },
-  pdfTitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginBottom: 15 
+  pdfTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15
   },
-  currentPdf: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    backgroundColor: '#F8F9FA', 
-    borderRadius: 10, 
-    padding: 12, 
-    marginBottom: 12 
+  currentPdf: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12
   },
-  removeText: { 
-    color: '#FF4444', 
-    fontWeight: '500' 
+  removeText: {
+    color: '#FF4444',
+    fontWeight: '500'
   },
-  uploadButton: { 
-    padding: 12, 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: '#8B0000', 
-    borderStyle: 'dashed', 
-    alignItems: 'center', 
-    marginTop: 8 
+  uploadButton: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#8B0000',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginTop: 8
   },
-  saveButton: { 
-    backgroundColor: '#8B0000', 
-    padding: 16, 
-    borderRadius: 10, 
-    alignItems: 'center', 
-    marginTop: 20 
+  saveButton: {
+    backgroundColor: '#8B0000',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20
   },
-  saveButtonText: { 
-    color: '#FFF', 
-    fontSize: 16, 
-    fontWeight: 'bold' 
+  saveButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold'
   },
-  
-  // 🔥 MODAIS DE SELEÇÃO
-  selectModalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'flex-end' 
+
+  selectModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
   },
-  selectModalContainer: { 
-    backgroundColor: '#FFF', 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20, 
-    maxHeight: '70%' 
+  selectModalContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%'
   },
-  selectModalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#E0E0E0' 
+  selectModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0'
   },
-  selectModalTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#333' 
+  selectModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333'
   },
-  selectOption: { 
-    padding: 16, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#F0F0F0' 
+  selectOption: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0'
   },
-  selectOptionText: { 
-    fontSize: 16, 
-    color: '#333' 
+  selectOptionText: {
+    fontSize: 16,
+    color: '#333'
   },
-  
-  // 🔥 MODAL GLOBAL
+
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { USUARIOS_URL } from '../service/api';
-import { saveUserData } from '../service/auth';
+import { saveUserData, STORAGE_KEYS } from '../service/auth';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -73,31 +73,21 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    // Validação CPF
     if (!cpf.trim()) {
-      abrirModal(
-        'erro',
-        '⚠️ Campo Vazio',
-        'Por favor, digite seu CPF para continuar.'
-      );
+      abrirModal('erro', '⚠️ Campo Vazio', 'Por favor, digite seu CPF para continuar.');
       return;
     }
 
     const cpfLimpo = limparCPF(cpf);
     if (cpfLimpo.length !== 11) {
-      abrirModal(
-        'erro',
-        '📄 CPF Inválido',
-        'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00'
-      );
+      abrirModal('erro', '📄 CPF Inválido', 'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00');
       return;
     }
 
+    // Validação Senha
     if (!password.trim()) {
-      abrirModal(
-        'erro',
-        '🔒 Campo Vazio',
-        'Por favor, digite sua senha para continuar.'
-      );
+      abrirModal('erro', '🔒 Campo Vazio', 'Por favor, digite sua senha para continuar.');
       return;
     }
 
@@ -106,7 +96,10 @@ export default function LoginScreen() {
     try {
       const loginUrl = `${USUARIOS_URL}/login`;
       console.log('📡 ====== INICIANDO LOGIN ======');
+      console.log('📡 URL:', loginUrl);
+      console.log('📡 CPF:', cpfLimpo);
 
+      // ===== 1. FAZ REQUISIÇÃO PARA O BACKEND =====
       const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
@@ -120,8 +113,10 @@ export default function LoginScreen() {
       });
 
       const data = await response.json();
-      console.log('📡 Resposta:', JSON.stringify(data, null, 2));
+      console.log('📡 Resposta status:', response.status);
+      console.log('📡 Resposta data:', JSON.stringify(data, null, 2));
 
+      // ===== 2. TRATAMENTO DE ERROS =====
       if (response.status === 404) {
         abrirModal(
           'erro',
@@ -131,7 +126,7 @@ export default function LoginScreen() {
           undefined,
           {
             texto: 'Criar Conta',
-            acao: () => router.push('/admin/RegisterScreen')
+            acao: () => navigateToRegister()
           }
         );
         setLoading(false);
@@ -147,7 +142,7 @@ export default function LoginScreen() {
           undefined,
           {
             texto: 'Esqueci minha senha',
-            acao: () => router.push('/recuperarSenha')
+            acao: () => navigateToRecuperarSenha()
           }
         );
         setLoading(false);
@@ -155,60 +150,59 @@ export default function LoginScreen() {
       }
 
       if (!response.ok) {
-        abrirModal(
-          'erro',
-          '❌ Erro no Login',
-          data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.'
-        );
+        abrirModal('erro', '❌ Erro no Login', data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.');
         setLoading(false);
         return;
       }
 
+      // ===== 3. VERIFICA SE VEIO O TOKEN =====
       if (!data.token || !data.usuario) {
-        abrirModal(
-          'erro',
-          '❌ Resposta Inválida',
-          'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.'
-        );
+        console.error('❌ Dados incompletos:', data);
+        abrirModal('erro', '❌ Resposta Inválida', 'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.');
         setLoading(false);
         return;
       }
 
+      // Garantir que tipo_usuario existe
       if (data.usuario.tipo_usuario === undefined) {
-        data.usuario.tipo_usuario = 0;
+        data.usuario.tipo_usuario = 0; // Padrão: Paciente
       }
 
+      console.log('🔑 Token recebido do BACKEND:', data.token.substring(0, 30) + '...');
+      console.log('👤 Usuário:', data.usuario);
+
+      // ===== 4. SALVA O TOKEN QUE VEIO DO BACKEND =====
       const salvou = await saveUserData(data.token, data.usuario);
       
       if (!salvou) {
-        abrirModal(
-          'erro',
-          '❌ Erro ao Salvar',
-          'Não foi possível salvar seus dados localmente.\n\nVerifique o armazenamento do dispositivo.'
-        );
+        abrirModal('erro', '❌ Erro ao Salvar', 'Não foi possível salvar seus dados localmente.');
         setLoading(false);
         return;
       }
 
-      const tokenFinal = await AsyncStorage.getItem('token');
-      const userFinal = await AsyncStorage.getItem('userData');
+      // ===== 5. VERIFICA SE SALVOU CORRETAMENTE =====
+      const tokenSalvo = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+      const userSalvo = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       
-      console.log('🔍 Verificação final antes de redirecionar:');
-      console.log('📌 Token existe?', !!tokenFinal);
-      console.log('📌 UserData existe?', !!userFinal);
+      console.log('🔍 Verificação final:');
+      console.log('📌 Token salvo?', !!tokenSalvo);
+      console.log('📌 Token:', tokenSalvo?.substring(0, 30) + '...');
+      console.log('📌 UserData salvo?', !!userSalvo);
+      console.log('📌 UserData:', userSalvo ? JSON.parse(userSalvo) : null);
 
-      if (!tokenFinal || !userFinal) {
-        console.error('❌ Dados sumiram!');
-        abrirModal(
-          'erro',
-          '❌ Erro ao Salvar',
-          'Erro ao salvar seus dados. Tente novamente.'
-        );
+      if (!tokenSalvo || !userSalvo) {
+        console.error('❌ Falha na verificação dos dados salvos!');
+        abrirModal('erro', '❌ Erro ao Salvar', 'Erro ao salvar seus dados. Tente novamente.');
         setLoading(false);
         return;
       }
 
+      // ===== 6. SUCESSO! REDIRECIONA =====
       const tipoDescricao = data.usuario.tipo_usuario === 1 ? 'Médico' : 'Paciente';
+      
+      console.log('✅ Login realizado com sucesso!');
+      console.log(`👤 Tipo: ${tipoDescricao}`);
+      console.log('🚀 Redirecionando para home...');
       
       abrirModal(
         'sucesso',
@@ -216,7 +210,7 @@ export default function LoginScreen() {
         `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\n👤 Tipo: ${tipoDescricao}`,
         'ENTRAR',
         () => {
-          console.log('🚀 REDIRECIONANDO PARA HOME...');
+          console.log('🚀 NAVEGANDO PARA HOME...');
           router.replace('/(tabs)');
         }
       );
@@ -226,7 +220,7 @@ export default function LoginScreen() {
       abrirModal(
         'erro',
         '❌ Erro de Conexão',
-        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.',
+        `Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet.\n\nDetalhe: ${error.message || 'Erro desconhecido'}`,
         'Tentar Novamente'
       );
     } finally {
@@ -234,11 +228,14 @@ export default function LoginScreen() {
     }
   };
 
+  // 🔥 FUNÇÕES DE NAVEGAÇÃO - IGUAIS
   const navigateToRegister = () => {
+    console.log('🚀 Navegando para cadastro...');
     router.push('/admin/RegisterScreen');
   };
 
   const navigateToRecuperarSenha = () => {
+    console.log('🚀 Navegando para recuperar senha...');
     router.push('/recuperarSenha');
   };
 
@@ -338,6 +335,7 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* 🔥 ESQUECI MINHA SENHA - IGUAL */}
           <TouchableOpacity
             style={styles.forgotButton}
             onPress={navigateToRecuperarSenha}
@@ -345,8 +343,15 @@ export default function LoginScreen() {
           >
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
-          
-          
+
+          {/* 🔥 CADASTRE-SE - IGUAL AO ESQUECI SENHA */}
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={navigateToRegister}
+            disabled={loading}
+          >
+            <Text style={styles.registerTextLink}>Não tem uma conta? Cadastre-se</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -555,23 +560,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  // 🔥 CADASTRO - IGUAL AO ESQUECI SENHA
+  registerButton: {
     alignItems: 'center',
-    marginTop: 25,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    marginTop: 12,
   },
-  registerText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  registerLink: {
+  registerTextLink: {
     color: '#8B0000',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 
   // 🔥 ESTILOS DO MODAL

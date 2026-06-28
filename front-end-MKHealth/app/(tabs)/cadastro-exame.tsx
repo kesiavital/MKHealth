@@ -1,6 +1,7 @@
 // app/(tabs)/cadastro-exame.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -9,7 +10,9 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
+import { STORAGE_KEYS } from '../../service/auth';
 
 const API_URL = `http://${IP}:3000/api/exames`;
 
@@ -85,6 +89,9 @@ export default function CadastroExameScreen() {
   const [tipoCustom, setTipoCustom] = useState(false);
   const [medicoCustom, setMedicoCustom] = useState(false);
   const [laboratorioCustom, setLaboratorioCustom] = useState(false);
+  const [customTipoValue, setCustomTipoValue] = useState('');
+  const [customMedicoValue, setCustomMedicoValue] = useState('');
+  const [customLaboratorioValue, setCustomLaboratorioValue] = useState('');
   
   const [attachment, setAttachment] = useState<AttachmentFile | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -103,7 +110,7 @@ export default function CadastroExameScreen() {
 
   const verificarAcesso = async () => {
     try {
-      const userDataString = await AsyncStorage.getItem('userData');
+      const userDataString = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       if (userDataString) {
         const userData = JSON.parse(userDataString);
         if (userData?.tipo_usuario !== 1) {
@@ -134,6 +141,41 @@ export default function CadastroExameScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 🔥 FUNÇÃO PARA FAZER REQUISIÇÕES COM TOKEN
+  const fetchWithToken = async (url: string, options: any = {}) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+    
+    if (!token) {
+      throw new Error('Token não encontrado');
+    }
+
+    const headers: any = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+    };
+
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    return response;
   };
 
   const abrirModal = (
@@ -252,11 +294,9 @@ export default function CadastroExameScreen() {
         formDataToSend.append('pdf', fileToUpload);
       }
 
-      const response = await fetch(API_URL, {
+      // 🔥 USANDO fetchWithToken COM AUTENTICAÇÃO
+      const response = await fetchWithToken(API_URL, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-        },
         body: formDataToSend,
       });
 
@@ -285,12 +325,18 @@ export default function CadastroExameScreen() {
           setTipoCustom(false);
           setMedicoCustom(false);
           setLaboratorioCustom(false);
+          router.replace('/(tabs)');
         }
       );
       
     } catch (error: any) {
       console.error('❌ Erro:', error);
-      abrirModal('erro', '❌ Erro', error.message || 'Não foi possível cadastrar o exame');
+      
+      if (error.message.includes('Sessão expirada')) {
+        abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+      } else {
+        abrirModal('erro', '❌ Erro', error.message || 'Não foi possível cadastrar o exame');
+      }
     } finally {
       setSaving(false);
       setUploadingFile(false);
@@ -351,7 +397,7 @@ export default function CadastroExameScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* 🔥 HEADER COM GRADIENTE E LOGO */}
+          {/* HEADER */}
           <LinearGradient
             colors={['#8B0000', '#A52A2A']}
             start={{ x: 0, y: 0 }}
@@ -373,7 +419,7 @@ export default function CadastroExameScreen() {
             <Text style={styles.headerSubtitle}>Preencha todos os campos obrigatórios (*)</Text>
           </LinearGradient>
 
-          {/* 🔥 FORMULÁRIO */}
+          {/* FORMULÁRIO */}
           <View style={styles.formCard}>
             {/* Nome do Paciente */}
             <View style={styles.inputGroup}>
@@ -556,8 +602,294 @@ export default function CadastroExameScreen() {
           </View>
         </ScrollView>
 
-        {/* MODAIS DE SELEÇÃO - mantidos */}
-        {/* ... (todos os modais de seleção permanecem iguais) ... */}
+        {/* MODAL DE SELEÇÃO - TIPO EXAME */}
+        <Modal visible={showTipoSelect} transparent animationType="slide">
+          <View style={styles.selectModalOverlay}>
+            <View style={styles.selectModalContainer}>
+              <View style={styles.selectModalHeader}>
+                <Text style={styles.selectModalTitle}>Selecione o Tipo</Text>
+                <TouchableOpacity onPress={() => setShowTipoSelect(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {TIPOS_EXAME.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      if (item === 'Outro') {
+                        setTipoCustom(true);
+                        setShowTipoSelect(false);
+                      } else {
+                        setFormData({ ...formData, tipo_exame: item });
+                        setShowTipoSelect(false);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.selectOptionText, item === 'Outro' && styles.customOptionText]}>
+                      {item}
+                    </Text>
+                    {formData.tipo_exame === item && (
+                      <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL DE SELEÇÃO - MÉDICO */}
+        <Modal visible={showMedicoSelect} transparent animationType="slide">
+          <View style={styles.selectModalOverlay}>
+            <View style={styles.selectModalContainer}>
+              <View style={styles.selectModalHeader}>
+                <Text style={styles.selectModalTitle}>Selecione o Médico</Text>
+                <TouchableOpacity onPress={() => setShowMedicoSelect(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {MEDICOS.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      if (item === 'Outro') {
+                        setMedicoCustom(true);
+                        setShowMedicoSelect(false);
+                      } else {
+                        setFormData({ ...formData, medico_solicitante: item });
+                        setShowMedicoSelect(false);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.selectOptionText, item === 'Outro' && styles.customOptionText]}>
+                      {item}
+                    </Text>
+                    {formData.medico_solicitante === item && (
+                      <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL DE SELEÇÃO - LABORATÓRIO */}
+        <Modal visible={showLaboratorioSelect} transparent animationType="slide">
+          <View style={styles.selectModalOverlay}>
+            <View style={styles.selectModalContainer}>
+              <View style={styles.selectModalHeader}>
+                <Text style={styles.selectModalTitle}>Selecione o Laboratório</Text>
+                <TouchableOpacity onPress={() => setShowLaboratorioSelect(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {LABORATORIOS.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      if (item === 'Outro') {
+                        setLaboratorioCustom(true);
+                        setShowLaboratorioSelect(false);
+                      } else {
+                        setFormData({ ...formData, laboratorio: item });
+                        setShowLaboratorioSelect(false);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.selectOptionText, item === 'Outro' && styles.customOptionText]}>
+                      {item}
+                    </Text>
+                    {formData.laboratorio === item && (
+                      <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL CUSTOM - TIPO */}
+        <Modal visible={tipoCustom} transparent animationType="fade">
+          <Pressable style={styles.customInputOverlay} onPress={() => setTipoCustom(false)}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o tipo de exame</Text>
+              <TextInput
+                style={styles.customInput}
+                placeholder="Ex: Ressonância Magnética"
+                value={customTipoValue}
+                onChangeText={setCustomTipoValue}
+                autoFocus
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity onPress={() => setTipoCustom(false)}>
+                  <Text style={[styles.customInputCancel, { color: '#666' }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (customTipoValue.trim()) {
+                      setFormData({ ...formData, tipo_exame: customTipoValue.trim() });
+                      setCustomTipoValue('');
+                      setTipoCustom(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.customInputConfirm, { color: '#8B0000', fontWeight: 'bold' }]}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* MODAL CUSTOM - MÉDICO */}
+        <Modal visible={medicoCustom} transparent animationType="fade">
+          <Pressable style={styles.customInputOverlay} onPress={() => setMedicoCustom(false)}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o nome do médico</Text>
+              <TextInput
+                style={styles.customInput}
+                placeholder="Ex: Dr. José Santos"
+                value={customMedicoValue}
+                onChangeText={setCustomMedicoValue}
+                autoFocus
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity onPress={() => setMedicoCustom(false)}>
+                  <Text style={[styles.customInputCancel, { color: '#666' }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (customMedicoValue.trim()) {
+                      setFormData({ ...formData, medico_solicitante: customMedicoValue.trim() });
+                      setCustomMedicoValue('');
+                      setMedicoCustom(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.customInputConfirm, { color: '#8B0000', fontWeight: 'bold' }]}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* MODAL CUSTOM - LABORATÓRIO */}
+        <Modal visible={laboratorioCustom} transparent animationType="fade">
+          <Pressable style={styles.customInputOverlay} onPress={() => setLaboratorioCustom(false)}>
+            <View style={styles.customInputContainer}>
+              <Text style={styles.customInputTitle}>Digite o nome do laboratório</Text>
+              <TextInput
+                style={styles.customInput}
+                placeholder="Ex: Lab Central"
+                value={customLaboratorioValue}
+                onChangeText={setCustomLaboratorioValue}
+                autoFocus
+              />
+              <View style={styles.customInputButtons}>
+                <TouchableOpacity onPress={() => setLaboratorioCustom(false)}>
+                  <Text style={[styles.customInputCancel, { color: '#666' }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (customLaboratorioValue.trim()) {
+                      setFormData({ ...formData, laboratorio: customLaboratorioValue.trim() });
+                      setCustomLaboratorioValue('');
+                      setLaboratorioCustom(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.customInputConfirm, { color: '#8B0000', fontWeight: 'bold' }]}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={formData.data_exame}
+            mode="date"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                setFormData({ ...formData, data_exame: selectedDate });
+              }
+            }}
+          />
+        )}
+
+        {/* MODAL UNIVERSAL */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={fecharModal}
+        >
+          <Pressable style={styles.modalOverlayGlobal} onPress={fecharModal}>
+            <View style={styles.modalContainerGlobal}>
+              <Pressable style={styles.modalContentGlobal} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.modalIconContainer}>
+                  {renderModalIcon()}
+                </View>
+
+                <Text style={[
+                  styles.modalTitle,
+                  modalTipo === 'sucesso' && styles.modalTitleSuccess,
+                  modalTipo === 'erro' && styles.modalTitleError,
+                  modalTipo === 'info' && styles.modalTitleInfo,
+                  modalTipo === 'confirmacao' && styles.modalTitleConfirm,
+                ]}>
+                  {modalTitulo}
+                </Text>
+
+                <Text style={[
+                  styles.modalMensagem,
+                  modalTipo === 'sucesso' && styles.modalMensagemSuccess,
+                  modalTipo === 'erro' && styles.modalMensagemError,
+                ]}>
+                  {modalMensagem}
+                </Text>
+
+                <View style={styles.modalBotoesContainer}>
+                  {modalBotaoSecundario && (
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.modalButtonSecundario]}
+                      onPress={() => {
+                        setModalVisible(false);
+                        modalBotaoSecundario?.acao();
+                      }}
+                    >
+                      <Text style={[styles.modalButtonText, styles.modalButtonTextSecundario]}>
+                        {modalBotaoSecundario.texto}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.modalButton,
+                      modalTipo === 'sucesso' && styles.modalButtonSuccess,
+                      modalTipo === 'erro' && styles.modalButtonError,
+                      modalTipo === 'info' && styles.modalButtonInfo,
+                      modalTipo === 'confirmacao' && styles.modalButtonConfirm,
+                      modalBotaoSecundario && styles.modalButtonPrincipal,
+                    ]}
+                    onPress={fecharModal}
+                  >
+                    <Text style={styles.modalButtonText}>{modalBotaoTexto}</Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -576,7 +908,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   
-  // 🔥 HEADER COM GRADIENTE E LOGO
   header: {
     paddingVertical: 30,
     paddingHorizontal: 20,
@@ -595,8 +926,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerLogo: {
-    width: 70, // 🔥 AUMENTADO DE 45 para 70
-    height: 70, // 🔥 AUMENTADO DE 45 para 70
+    width: 70,
+    height: 70,
     tintColor: '#FFF',
   },
   headerIconContainer: {
@@ -620,7 +951,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // 🔥 FORMULÁRIO
   formCard: {
     backgroundColor: '#FFF',
     margin: 16,
@@ -688,7 +1018,6 @@ const styles = StyleSheet.create({
     color: '#999',
   },
 
-  // 🔥 PDF SECTION
   pdfSection: {
     marginTop: 10,
     marginBottom: 20,
@@ -772,7 +1101,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-  // 🔥 UPLOADING
   uploadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -789,7 +1117,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // 🔥 SAVE BUTTON
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -817,7 +1144,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // 🔥 LOADING
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -830,7 +1156,6 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 
-  // 🔥 MODAL DE SELEÇÃO
   selectModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -868,16 +1193,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  customOption: {
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    marginTop: 8,
-    backgroundColor: '#FFF5F5',
-  },
   customOptionText: {
     color: '#8B0000',
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
+
   customInputOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -919,7 +1239,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
-  // 🔥 MODAL GLOBAL
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

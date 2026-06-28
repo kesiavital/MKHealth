@@ -20,7 +20,7 @@ function validarData(data) {
 // Função para deletar arquivo físico
 function deletarArquivoPdf(filename) {
   if (!filename) return;
-  
+
   const filePath = path.join(uploadDir, filename);
   if (fs.existsSync(filePath)) {
     try {
@@ -40,20 +40,22 @@ function verificarPdfExiste(filename) {
 }
 
 module.exports = {
+  // ============================================
   // CRIAR EXAME (com upload de PDF)
+  // ============================================
   async criar(req, res) {
     try {
       console.log('📝 Iniciando cadastro de exame...');
       console.log('📝 Body recebido:', req.body);
       console.log('📎 Arquivo recebido:', req.file ? req.file.originalname : 'Nenhum');
-      
-      const { 
-        paciente_nome, 
-        tipo_exame, 
-        data_exame, 
-        medico_solicitante, 
-        laboratorio, 
-        resultados, 
+
+      const {
+        paciente_nome,
+        tipo_exame,
+        data_exame,
+        medico_solicitante,
+        laboratorio,
+        resultados,
         observacoes
       } = req.body;
 
@@ -62,8 +64,8 @@ module.exports = {
         if (req.file) {
           deletarArquivoPdf(req.file.filename);
         }
-        return res.status(400).json({ 
-          erro: "Todos os campos obrigatórios devem ser preenchidos: paciente_nome, tipo_exame, data_exame, medico_solicitante, laboratorio" 
+        return res.status(400).json({
+          erro: "Todos os campos obrigatórios devem ser preenchidos: paciente_nome, tipo_exame, data_exame, medico_solicitante, laboratorio"
         });
       }
 
@@ -72,8 +74,8 @@ module.exports = {
         if (req.file) {
           deletarArquivoPdf(req.file.filename);
         }
-        return res.status(400).json({ 
-          erro: "Data do exame inválida" 
+        return res.status(400).json({
+          erro: "Data do exame inválida"
         });
       }
 
@@ -129,32 +131,34 @@ module.exports = {
 
     } catch (error) {
       console.error('❌ Erro detalhado no cadastro do exame:', error);
-      
+
       if (req.file) {
         deletarArquivoPdf(req.file.filename);
       }
-      
+
       if (error.name === 'SequelizeValidationError') {
         const mensagens = error.errors.map(err => err.message).join(', ');
         return res.status(400).json({ erro: mensagens });
       }
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         erro: "Erro interno do servidor",
         detalhe: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
 
+  // ============================================
   // LISTAR TODOS OS EXAMES
+  // ============================================
   async listar(req, res) {
     try {
       console.log('🔍 Buscando todos os exames...');
-      
+
       const exames = await Exame.findAll({
         order: [['data_exame', 'DESC']]
       });
-      
+
       const examesFormatados = exames.map(e => ({
         id: e.id,
         paciente_nome: e.paciente_nome,
@@ -171,31 +175,33 @@ module.exports = {
         created_at: e.createdAt,
         updated_at: e.updatedAt
       }));
-      
+
       console.log(`✅ Encontrados ${examesFormatados.length} exames`);
-      
+
       return res.json(examesFormatados);
     } catch (error) {
       console.error('❌ Erro ao listar exames:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
+  // ============================================
   // BUSCAR EXAME POR ID
+  // ============================================
   async buscarPorId(req, res) {
     try {
       console.log(`🔍 Buscando exame por ID: ${req.params.id}`);
-      
+
       const exame = await Exame.findByPk(req.params.id);
-      
+
       if (!exame) {
-        return res.status(404).json({ 
-          erro: "Exame não encontrado" 
+        return res.status(404).json({
+          erro: "Exame não encontrado"
         });
       }
-      
+
       return res.json({
         id: exame.id,
         paciente_nome: exame.paciente_nome,
@@ -214,39 +220,66 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar exame por ID:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
-  // DOWNLOAD DO PDF
+  // ============================================
+  // DOWNLOAD DO PDF (COM VERIFICAÇÃO DE PERMISSÃO)
+  // ============================================
   async downloadPdf(req, res) {
     try {
+      console.log('📥 ====== DOWNLOAD PDF ======');
+      console.log('👤 Usuário autenticado:', req.user);
+      console.log('📌 ID do exame:', req.params.id);
+
       const exame = await Exame.findByPk(req.params.id);
-      
+
       if (!exame) {
-        return res.status(404).json({ 
-          erro: "Exame não encontrado" 
+        console.log('❌ Exame não encontrado');
+        return res.status(404).json({
+          erro: "Exame não encontrado"
         });
       }
-      
+
+      // ===== VERIFICAR PERMISSÃO =====
+      const { id: usuarioId, tipo_usuario, nome_completo, cpf } = req.user;
+
+      if (tipo_usuario !== 1) {
+        const pertenceAoPaciente =
+          exame.paciente_nome?.toLowerCase() === nome_completo?.toLowerCase() ||
+          exame.paciente_cpf === cpf;
+
+        if (!pertenceAoPaciente) {
+          console.log('❌ Acesso negado');
+          return res.status(403).json({
+            erro: "Acesso negado"
+          });
+        }
+      }
+
       if (!exame.pdf_filename) {
-        return res.status(404).json({ 
-          erro: "PDF não encontrado para este exame" 
+        console.log('❌ Exame não possui PDF');
+        return res.status(404).json({
+          erro: "PDF não encontrado para este exame"
         });
       }
-      
+
       const filePath = path.join(uploadDir, exame.pdf_filename);
-      
+      console.log('📄 Caminho do PDF:', filePath);
+
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ 
+        console.log('❌ Arquivo não encontrado');
+        return res.status(404).json({
           erro: "Arquivo PDF não encontrado no servidor",
           filename: exame.pdf_filename,
           procurado_em: filePath
         });
       }
-      
+
+      // Forçar download
       res.download(filePath, exame.pdf_originalname, (err) => {
         if (err) {
           console.error('❌ Erro no download:', err);
@@ -255,84 +288,101 @@ module.exports = {
           }
         }
       });
+
+      console.log('✅ Download iniciado:', exame.pdf_originalname);
+
     } catch (error) {
-      console.error('❌ Erro ao baixar PDF:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      console.error('❌ Erro no download:', error);
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
-  // VISUALIZAR PDF (abrir no navegador) - VERSÃO SIMPLIFICADA E CORRIGIDA
+  // ============================================
+  // VISUALIZAR PDF - SERVE O PDF DIRETAMENTE (CORRIGIDO)
+  // ============================================
+  // controllers/exameController.js
+
+  // ============================================
+  // 🔥 VISUALIZAR PDF - SEM AUTENTICAÇÃO
+  // ============================================
   async visualizarPdf(req, res) {
     try {
+      console.log('📄 ====== VISUALIZAR PDF ======');
+      console.log('📌 ID do exame:', req.params.id);
+
       const exame = await Exame.findByPk(req.params.id);
-      
+
       if (!exame) {
-        return res.status(404).json({ 
-          erro: "Exame não encontrado" 
+        console.log('❌ Exame não encontrado');
+        return res.status(404).json({
+          erro: "Exame não encontrado"
         });
       }
-      
+
+      // ===== VERIFICAR SE TEM PDF =====
       if (!exame.pdf_filename) {
-        return res.status(404).json({ 
-          erro: "PDF não encontrado para este exame" 
+        console.log('❌ Exame não possui PDF');
+        return res.status(404).json({
+          erro: "PDF não encontrado para este exame"
         });
       }
-      
-      // Construir o caminho do arquivo
+
+      // ===== CONSTRUIR CAMINHO DO ARQUIVO =====
+      const path = require('path');
+      const fs = require('fs');
+      const { uploadDir } = require('../config/upload');
+
       const filePath = path.join(uploadDir, exame.pdf_filename);
-      
-      console.log('=== VISUALIZAR PDF ===');
-      console.log('ID:', req.params.id);
-      console.log('Filename:', exame.pdf_filename);
-      console.log('Upload dir:', uploadDir);
-      console.log('Caminho completo:', filePath);
-      console.log('Arquivo existe?', fs.existsSync(filePath));
-      
-      // Verificar se o arquivo existe
+      console.log('📄 Caminho do PDF:', filePath);
+
+      // ===== VERIFICAR SE O ARQUIVO EXISTE =====
       if (!fs.existsSync(filePath)) {
-        // Se não existir, tentar encontrar em outras possíveis localizações
-        const alternativePath = path.join(process.cwd(), 'uploads', 'exams', exame.pdf_filename);
-        console.log('Tentando caminho alternativo:', alternativePath);
-        
-        if (fs.existsSync(alternativePath)) {
-          console.log('✅ Encontrado no caminho alternativo!');
-          // Redirecionar para o caminho estático
-          return res.redirect(`/uploads/exams/${exame.pdf_filename}`);
-        }
-        
-        return res.status(404).json({ 
+        console.log('❌ Arquivo PDF não encontrado no servidor');
+        return res.status(404).json({
           erro: "Arquivo PDF não encontrado no servidor",
-          filename: exame.pdf_filename,
-          caminho_procurado: filePath,
-          dica: "Verifique se o arquivo está na pasta: uploads/exams/"
+          filename: exame.pdf_filename
         });
       }
-      
-      // REDIRECIONAR PARA O ARQUIVO ESTÁTICO (solução mais simples)
-      // Isso permite que o navegador gerencie o PDF diretamente
-      const pdfUrl = `/uploads/exams/${exame.pdf_filename}`;
-      console.log('📎 Redirecionando para:', pdfUrl);
-      
-      // Redirecionar para o arquivo estático
-      return res.redirect(pdfUrl);
-      
+
+      // ===== SERVIR O PDF =====
+      const stat = fs.statSync(filePath);
+      console.log('📄 Tamanho do arquivo:', stat.size, 'bytes');
+
+      // Definir headers para exibir inline
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': stat.size,
+        'Content-Disposition': `inline; filename="${exame.pdf_originalname || 'exame.pdf'}"`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
+
+      // Criar stream e enviar
+      const readStream = fs.createReadStream(filePath);
+      readStream.pipe(res);
+
+      console.log('✅ PDF enviado com sucesso:', exame.pdf_originalname);
+
     } catch (error) {
       console.error('❌ Erro ao visualizar PDF:', error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         erro: "Erro interno ao processar o PDF",
-        detalhe: error.message 
+        detalhe: error.message
       });
     }
   },
 
+  // ============================================
   // BUSCAR EXAMES POR PACIENTE
+  // ============================================
   async buscarPorPaciente(req, res) {
     try {
       const { nome } = req.params;
       console.log(`🔍 Buscando exames do paciente: ${nome}`);
-      
+
       const exames = await Exame.findAll({
         where: {
           paciente_nome: {
@@ -341,13 +391,13 @@ module.exports = {
         },
         order: [['data_exame', 'DESC']]
       });
-      
+
       if (exames.length === 0) {
-        return res.status(404).json({ 
-          erro: "Nenhum exame encontrado para este paciente" 
+        return res.status(404).json({
+          erro: "Nenhum exame encontrado para este paciente"
         });
       }
-      
+
       const examesFormatados = exames.map(e => ({
         id: e.id,
         paciente_nome: e.paciente_nome,
@@ -363,9 +413,9 @@ module.exports = {
         created_at: e.createdAt,
         updated_at: e.updatedAt
       }));
-      
+
       console.log(`✅ Encontrados ${examesFormatados.length} exames para ${nome}`);
-      
+
       return res.json({
         sucesso: true,
         paciente: nome,
@@ -374,30 +424,32 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar exames por paciente:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
+  // ============================================
   // BUSCAR EXAMES POR PERÍODO
+  // ============================================
   async buscarPorPeriodo(req, res) {
     try {
       const { dataInicio, dataFim } = req.query;
       console.log(`🔍 Buscando exames no período: ${dataInicio} até ${dataFim}`);
-      
+
       if (!dataInicio || !dataFim) {
-        return res.status(400).json({ 
-          erro: "Datas de início e fim são obrigatórias" 
+        return res.status(400).json({
+          erro: "Datas de início e fim são obrigatórias"
         });
       }
-      
+
       if (!validarData(dataInicio) || !validarData(dataFim)) {
-        return res.status(400).json({ 
-          erro: "Datas inválidas" 
+        return res.status(400).json({
+          erro: "Datas inválidas"
         });
       }
-      
+
       const exames = await Exame.findAll({
         where: {
           data_exame: {
@@ -406,7 +458,7 @@ module.exports = {
         },
         order: [['data_exame', 'DESC']]
       });
-      
+
       const examesFormatados = exames.map(e => ({
         id: e.id,
         paciente_nome: e.paciente_nome,
@@ -420,9 +472,9 @@ module.exports = {
         created_at: e.createdAt,
         updated_at: e.updatedAt
       }));
-      
+
       console.log(`✅ Encontrados ${examesFormatados.length} exames no período`);
-      
+
       return res.json({
         sucesso: true,
         periodo: {
@@ -434,50 +486,52 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar exames por período:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
+  // ============================================
   // ATUALIZAR EXAME (com opção de atualizar PDF)
+  // ============================================
   async atualizar(req, res) {
     try {
       console.log(`✏️ Atualizando exame ID: ${req.params.id}`);
       console.log('📝 Body:', req.body);
       console.log('📎 Novo arquivo:', req.file ? req.file.originalname : 'Nenhum');
-      
+
       const exame = await Exame.findByPk(req.params.id);
-      
+
       if (!exame) {
         if (req.file) {
           deletarArquivoPdf(req.file.filename);
         }
-        return res.status(404).json({ 
-          erro: "Exame não encontrado" 
+        return res.status(404).json({
+          erro: "Exame não encontrado"
         });
       }
-      
-      const { 
-        paciente_nome, 
-        tipo_exame, 
-        data_exame, 
-        medico_solicitante, 
-        laboratorio, 
-        resultados, 
-        observacoes 
+
+      const {
+        paciente_nome,
+        tipo_exame,
+        data_exame,
+        medico_solicitante,
+        laboratorio,
+        resultados,
+        observacoes
       } = req.body;
-      
+
       // Validar data se for fornecida
       if (data_exame && !validarData(data_exame)) {
         if (req.file) {
           deletarArquivoPdf(req.file.filename);
         }
-        return res.status(400).json({ 
-          erro: "Data do exame inválida" 
+        return res.status(400).json({
+          erro: "Data do exame inválida"
         });
       }
-      
+
       // Se tiver novo PDF, deletar o antigo
       let pdfData = {};
       if (req.file) {
@@ -485,7 +539,7 @@ module.exports = {
         if (exame.pdf_filename) {
           deletarArquivoPdf(exame.pdf_filename);
         }
-        
+
         pdfData = {
           pdf_filename: req.file.filename,
           pdf_originalname: req.file.originalname,
@@ -495,7 +549,7 @@ module.exports = {
         };
         console.log('📎 PDF atualizado:', pdfData);
       }
-      
+
       // Atualizar apenas os campos fornecidos
       await exame.update({
         paciente_nome: paciente_nome !== undefined ? paciente_nome.trim() : exame.paciente_nome,
@@ -507,9 +561,9 @@ module.exports = {
         observacoes: observacoes !== undefined ? observacoes : exame.observacoes,
         ...pdfData
       });
-      
+
       console.log('✅ Exame atualizado com sucesso');
-      
+
       return res.json({
         sucesso: true,
         mensagem: "Exame atualizado com sucesso",
@@ -534,72 +588,76 @@ module.exports = {
       if (req.file) {
         deletarArquivoPdf(req.file.filename);
       }
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
+  // ============================================
   // DELETAR EXAME (remove também o arquivo PDF)
+  // ============================================
   async deletar(req, res) {
     try {
       console.log(`🗑️ Deletando exame ID: ${req.params.id}`);
-      
+
       const exame = await Exame.findByPk(req.params.id);
-      
+
       if (!exame) {
-        return res.status(404).json({ 
-          erro: "Exame não encontrado" 
+        return res.status(404).json({
+          erro: "Exame não encontrado"
         });
       }
-      
+
       // Deletar PDF físico se existir
       if (exame.pdf_filename) {
         deletarArquivoPdf(exame.pdf_filename);
       }
-      
+
       await exame.destroy();
-      
+
       console.log('✅ Exame deletado com sucesso');
-      
-      return res.json({ 
-        sucesso: true, 
-        mensagem: "Exame removido com sucesso" 
+
+      return res.json({
+        sucesso: true,
+        mensagem: "Exame removido com sucesso"
       });
     } catch (error) {
       console.error('❌ Erro ao deletar exame:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   },
 
+  // ============================================
   // ESTATÍSTICAS
+  // ============================================
   async estatisticas(req, res) {
     try {
       console.log('📊 Buscando estatísticas...');
-      
+
       // Total de exames
       const totalExames = await Exame.count();
-      
+
       // Total de pacientes distintos
       const totalPacientes = await Exame.count({
         distinct: true,
         col: 'paciente_nome'
       });
-      
+
       // Total de médicos distintos
       const totalMedicos = await Exame.count({
         distinct: true,
         col: 'medico_solicitante'
       });
-      
+
       // Total de laboratórios distintos
       const totalLaboratorios = await Exame.count({
         distinct: true,
         col: 'laboratorio'
       });
-      
+
       // Exames por tipo
       const examesPorTipo = await Exame.findAll({
         attributes: [
@@ -609,7 +667,7 @@ module.exports = {
         group: ['tipo_exame'],
         order: [[Exame.sequelize.literal('quantidade'), 'DESC']]
       });
-      
+
       // Exames por mês (últimos 12 meses)
       const examesPorMes = await Exame.findAll({
         attributes: [
@@ -620,7 +678,7 @@ module.exports = {
         order: [[Exame.sequelize.literal('mes'), 'DESC']],
         limit: 12
       });
-      
+
       // Exames com PDF
       const examesComPdf = await Exame.count({
         where: {
@@ -629,9 +687,9 @@ module.exports = {
           }
         }
       });
-      
+
       console.log('✅ Estatísticas obtidas com sucesso');
-      
+
       return res.json({
         sucesso: true,
         estatisticas: {
@@ -647,8 +705,8 @@ module.exports = {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar estatísticas:', error);
-      return res.status(500).json({ 
-        erro: error.message 
+      return res.status(500).json({
+        erro: error.message
       });
     }
   }

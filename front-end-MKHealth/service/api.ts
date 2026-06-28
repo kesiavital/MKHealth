@@ -1,25 +1,31 @@
+// ========================================
 // service/api.ts
 // Configuração centralizada da API
+// ========================================
 
-// IP DO SEU COMPUTADOR - ALTERE AQUI SE O IP MUDAR
-const IP = '10.200.32.94';  // ← SEU IP ATUAL
-const PORTA = '3000';
+// IP DO COMPUTADOR ONDE O BACKEND ESTÁ RODANDO
+// Altere apenas esta linha quando mudar de rede.
+const LOCAL_IP = "192.168.15.9";
 
-// Comentamos as regras antigas temporariamente
-// const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
-// const HOST = Platform.OS === 'android' ? EMULATOR_HOST : LOCAL_IP;
+const PORTA = "3000";
 
-// Forçamos o uso do seu IP da ancoragem
-const HOST = LOCAL_IP; 
+// Host utilizado pela aplicação
+const HOST = LOCAL_IP;
 
+// URL base
 export const BASE_URL = `http://${HOST}:${PORTA}`;
-// ... resto do seu código
+
+// URL da API
 export const API_URL = `${BASE_URL}/api`;
+
+// Rotas
 export const USUARIOS_URL = `${API_URL}/usuarios`;
 export const EXAMES_URL = `${API_URL}/exames`;
 
-// Exporta o host no formato que suas telas esperam (para não quebrar)
+// Exporta o host para compatibilidade com outros arquivos
 export default HOST;
 
-// Para manter compatibilidade com telas que usam IP direto
-export const getFullUrl = (path: string) => `${BASE_URL}${path}`;
+// Função para montar qualquer rota
+export const getFullUrl = (path: string): string => {
+  return `${BASE_URL}${path}`;
+};

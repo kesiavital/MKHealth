@@ -19,6 +19,7 @@ import {
 import { LineChart, PieChart, ProgressChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
+import { STORAGE_KEYS } from '../../service/auth';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -83,7 +84,7 @@ export default function DashboardScreen() {
 
   const carregarUsuario = async () => {
     try {
-      const userDataString = await AsyncStorage.getItem('userData');
+      const userDataString = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       if (userDataString) {
         const data = JSON.parse(userDataString);
         setUserData(data);
@@ -101,43 +102,100 @@ export default function DashboardScreen() {
     console.log('🔄 Carregando dados...');
     setLoading(true);
     try {
-      const response = await fetch(API_URL);
-      const data: Exame[] = await response.json();
-      
+      // 🔥 PEGAR TOKEN
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+      console.log('🔑 Token encontrado?', !!token);
+
+      if (!token) {
+        console.log('❌ Token não encontrado');
+        setLoading(false);
+        return;
+      }
+
+      // 🔥 FAZER REQUISIÇÃO COM TOKEN
+      const response = await fetch(API_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📡 Status da resposta:', response.status);
+
+      if (response.status === 401) {
+        console.log('❌ Token expirado');
+        Alert.alert('Sessão expirada', 'Faça login novamente');
+        router.replace('/login');
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('📊 Dados recebidos:', Array.isArray(data) ? `Array com ${data.length} itens` : typeof data);
+
+      // 🔥 VERIFICAR SE data É UM ARRAY
+      let examesFiltrados: Exame[] = [];
+
+      if (Array.isArray(data)) {
+        examesFiltrados = data;
+        console.log(`✅ ${examesFiltrados.length} exames encontrados`);
+      } else if (data && typeof data === 'object') {
+        // Se for um objeto, tentar extrair os exames
+        if (data.exames && Array.isArray(data.exames)) {
+          examesFiltrados = data.exames;
+        } else if (data.data && Array.isArray(data.data)) {
+          examesFiltrados = data.data;
+        } else {
+          console.log('⚠️ Estrutura de dados não reconhecida');
+          examesFiltrados = [];
+        }
+      } else {
+        console.log('⚠️ Dados inválidos recebidos');
+        examesFiltrados = [];
+      }
+
       // 🔥 FILTRAR EXAMES BASEADO NO TIPO DE USUÁRIO
-      let examesFiltrados = data;
-      
+      let examesFinais = examesFiltrados;
+
       if (!isAdmin && userData) {
         // Paciente vê apenas seus exames
         const nomePaciente = userData.nome_completo?.toLowerCase().trim();
         const cpfPaciente = userData.cpf?.replace(/\D/g, '');
         
-        examesFiltrados = data.filter((exame: Exame) => {
+        examesFinais = examesFiltrados.filter((exame: Exame) => {
           const nomeExame = exame.paciente_nome?.toLowerCase().trim();
           const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
           return nomeExame === nomePaciente || cpfExame === cpfPaciente;
         });
         
-        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
+        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFinais.length} exames encontrados`);
       } else {
-        console.log(`📱 Médico - ${data.length} exames encontrados`);
+        console.log(`📱 Admin - ${examesFinais.length} exames encontrados`);
       }
       
-      setExames(examesFiltrados);
+      setExames(examesFinais);
       
       // 🔥 CALCULAR ESTATÍSTICAS COM OS EXAMES FILTRADOS
-      calcularEstatisticas(examesFiltrados);
-      calcularDadosGraficos(examesFiltrados);
+      if (examesFinais.length > 0) {
+        calcularEstatisticas(examesFinais);
+        calcularDadosGraficos(examesFinais);
+        
+        const ultimos = [...examesFinais].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ).slice(0, 5);
+        setUltimosExames(ultimos);
+      } else {
+        // Resetar dados se não houver exames
+        setEstatisticas(null);
+        setExamesPorMes([]);
+        setExamesPorTipo([]);
+        setUltimosExames([]);
+      }
       
-      const ultimos = [...examesFiltrados].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ).slice(0, 5);
-      setUltimosExames(ultimos);
-      
-      console.log(`✅ ${examesFiltrados.length} exames carregados`);
-    } catch (error) {
+      console.log(`✅ ${examesFinais.length} exames carregados`);
+    } catch (error: any) {
       console.error('❌ Erro:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados');
+      Alert.alert('Erro', 'Não foi possível carregar os dados: ' + (error.message || ''));
     } finally {
       setLoading(false);
     }

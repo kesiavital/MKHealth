@@ -1,45 +1,57 @@
-const express = require('express');
-const router = express.Router();
-const usuarioController = require('../controllers/UsuarioController');
-const upload = require('../config/multer');
+// routes/usuarioRoutes.js
+const express = require("express");
+const routes = express.Router();
 
-// ============================================
-// 🔴 ATENÇÃO: ROTAS ESPECÍFICAS PRIMEIRO!
-// ============================================
+const usuarioController = require("../controllers/UsuarioController");
+const uploadConfig = require("../config/upload");
+const { authMiddleware } = require("../middlewares/auth");
 
-// 1. Rota de verificação
-router.get('/verificar', usuarioController.verificarUsuarios);
+// Pega o upload do config
+const { upload } = uploadConfig;
 
-// 2. Cadastro
-router.post('/cadastro', upload.single('foto'), usuarioController.criar);
+// ===============================
+// LOGIN (PÚBLICO)
+// ===============================
+routes.post("/login", usuarioController.logar);
 
-// 3. LOGIN - TEM QUE VIR ANTES DO /:id !
-router.post('/login', usuarioController.logar);
+// ===============================
+// CADASTRO (PÚBLICO)
+// ===============================
+routes.post("/cadastro", upload.single("foto"), usuarioController.criar);
 
-// 4. Listar todos
-router.get('/', usuarioController.listar);
+// ===============================
+// VERIFICAR EMAIL (PÚBLICO)
+// ===============================
+routes.post("/verificar-email", usuarioController.verificarEmail);
 
-// ============================================
-// 🔥 ROTAS DE RECUPERAÇÃO DE SENHA
-// ============================================
+// ===============================
+// REDEFINIR SENHA (PÚBLICO)
+// ===============================
+routes.post("/redefinir-senha", usuarioController.redefinirSenha);
 
-// 5. Verificar email (recuperação de senha)
-router.post('/verificar-email', usuarioController.verificarEmail);
+// ===============================
+// VERIFICAR USUÁRIOS (PROTEGIDO)
+// ===============================
+routes.get("/verificar", authMiddleware, usuarioController.verificarUsuarios);
 
-// 6. Redefinir senha
-router.post('/redefinir-senha', usuarioController.redefinirSenha);
+// ===============================
+// LISTAR (PROTEGIDO)
+// ===============================
+routes.get("/", authMiddleware, usuarioController.listar);
 
-// ============================================
-// 🟢 ROTAS COM :id - DEPOIS das específicas
-// ============================================
+// ===============================
+// BUSCAR POR ID (PROTEGIDO)
+// ===============================
+routes.get("/:id", authMiddleware, usuarioController.buscarPorId);
 
-// 7. Buscar por ID
-router.get('/:id', usuarioController.buscarPorId);
+// ===============================
+// ATUALIZAR FOTO (PROTEGIDO)
+// ===============================
+routes.put("/:id/foto", authMiddleware, upload.single("foto"), usuarioController.atualizarFoto);
 
-// 8. Atualizar foto
-router.put('/:id/foto', upload.single('foto'), usuarioController.atualizarFoto);
+// ===============================
+// DELETAR (PROTEGIDO)
+// ===============================
+routes.delete("/:id", authMiddleware, usuarioController.deletar);
 
-// 9. Deletar
-router.delete('/:id', usuarioController.deletar);
-
-module.exports = router;
+module.exports = routes;

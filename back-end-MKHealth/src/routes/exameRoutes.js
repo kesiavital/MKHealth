@@ -1,68 +1,54 @@
-const express = require('express');
-const router = express.Router();
+// routes/examesRoutes.js
+const express = require("express");
+const routes = express.Router();
 
-const exameController = require('../controllers/ExameController');
-const { upload } = require('../config/upload');
+const exameController = require("../controllers/ExameController");
+const uploadConfig = require("../config/upload");
+const { authMiddleware } = require("../middlewares/auth");
 
-// ============================================
-// HEALTH CHECK
-// ============================================
+// Pega o upload do config
+const { upload } = uploadConfig;
 
-router.get('/health', (req, res) => {
+// ===============================
+// HEALTH CHECK (PÚBLICO)
+// ===============================
+routes.get("/health", (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString()
   });
 });
 
-// ============================================
-// ROTAS DE BUSCA
-// ============================================
+// ===============================
+// ROTAS DE BUSCA (PROTEGIDAS)
+// ===============================
+routes.get("/periodo", authMiddleware, exameController.buscarPorPeriodo);
+routes.get("/estatisticas", authMiddleware, exameController.estatisticas);
+routes.get("/stats", authMiddleware, exameController.estatisticas);
+routes.get("/paciente/:nome", authMiddleware, exameController.buscarPorPaciente);
+routes.get("/buscar/:nome", authMiddleware, exameController.buscarPorPaciente);
 
-router.get('/periodo', exameController.buscarPorPeriodo);
+// ===============================
+// ROTAS PRINCIPAIS (PROTEGIDAS)
+// ===============================
+routes.post("/", authMiddleware, upload.single("pdf"), exameController.criar);
+routes.get("/", authMiddleware, exameController.listar);
 
-router.get('/estatisticas', exameController.estatisticas);
+// ===============================
+// 🔥 ROTA PDF - SEM AUTENTICAÇÃO (PÚBLICA)
+// ===============================
+routes.get("/:id/visualizar", exameController.visualizarPdf);
 
-router.get('/stats', exameController.estatisticas);
+// ===============================
+// ROTA DOWNLOAD (PROTEGIDA)
+// ===============================
+routes.get("/:id/download", authMiddleware, exameController.downloadPdf);
 
-router.get('/paciente/:nome', exameController.buscarPorPaciente);
+// ===============================
+// ROTAS COM ID (PROTEGIDAS - SEMPRE POR ÚLTIMO)
+// ===============================
+routes.get("/:id", authMiddleware, exameController.buscarPorId);
+routes.put("/:id", authMiddleware, upload.single("pdf"), exameController.atualizar);
+routes.delete("/:id", authMiddleware, exameController.deletar);
 
-router.get('/buscar/:nome', exameController.buscarPorPaciente);
-
-// ============================================
-// ROTAS PRINCIPAIS
-// ============================================
-
-router.post(
-  '/',
-  upload.single('pdf'),
-  exameController.criar
-);
-
-router.get('/', exameController.listar);
-
-// ============================================
-// ROTAS PDF
-// ============================================
-
-router.get('/:id/download', exameController.downloadPdf);
-
-router.get('/:id/visualizar', exameController.visualizarPdf);
-
-// ============================================
-// ROTAS COM ID (SEMPRE POR ÚLTIMO)
-// ============================================
-
-router.get('/:id', exameController.buscarPorId);
-
-router.put(
-  '/:id',
-  upload.single('pdf'),
-  exameController.atualizar
-);
-
-router.delete('/:id', exameController.deletar);
-
-// ============================================
-
-module.exports = router;
+module.exports = routes;
