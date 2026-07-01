@@ -1,5 +1,6 @@
 // app/admin/RegisterScreen.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BASE_URL, USUARIOS_URL } from '../../service/api';
+import { STORAGE_KEYS } from '../../service/auth';
 
 interface Usuario {
   id: number;
@@ -68,6 +70,43 @@ export default function RegisterScreen() {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
+
+  // 🔥 FUNÇÃO PARA FAZER REQUISIÇÕES COM TOKEN (mesmo padrão do exames.tsx)
+  const fetchWithToken = async (url: string, options: any = {}) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+
+    if (!token) {
+      throw new Error('Token não encontrado');
+    }
+
+    const headers: any = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+    };
+
+    // Se for FormData, não define Content-Type (o browser/RN define automaticamente)
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // Se token expirou, limpa e redireciona
+    if (response.status === 401) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    return response;
+  };
 
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS !== 'web') {
@@ -139,9 +178,9 @@ export default function RegisterScreen() {
       'Escolha uma opção',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Tirar Foto', onPress: tirarFoto },
-        { text: ' Escolher da Galeria', onPress: escolherFotoGaleria },
-        ...(foto ? [{ text: 'Remover Foto', onPress: removerFoto, style: 'destructive' as const }] : [])
+        { text: '📷 Tirar Foto', onPress: tirarFoto },
+        { text: '🖼️ Escolher da Galeria', onPress: escolherFotoGaleria },
+        ...(foto ? [{ text: '🗑️ Remover Foto', onPress: removerFoto, style: 'destructive' as const }] : [])
       ]
     );
   };
@@ -172,21 +211,37 @@ export default function RegisterScreen() {
   };
 
   const limparCPF = (cpf: string): string => cpf.replace(/[^\d]/g, '');
+  
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
+  // 🔥 CARREGAR USUÁRIOS COM TOKEN
   const carregarUsuarios = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(`${USUARIOS_URL}`);
+      console.log('📋 Carregando usuários...');
+      const response = await fetchWithToken(USUARIOS_URL);
       const data = await response.json();
+      
+      console.log('📋 Usuários carregados:', Array.isArray(data) ? data.length : 'N/A');
       setUsuarios(data);
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar usuários:', error);
+      
+      if (error.message.includes('Sessão expirada')) {
+        Alert.alert('⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        router.replace('/login');
+      } else {
+        Alert.alert('❌ Erro', 'Não foi possível carregar a lista de usuários');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  // 🔥 CADASTRAR (público - não precisa de token)
   const handleCadastrar = async () => {
     if (!formData.nome_completo.trim()) {
       Alert.alert('Erro', 'Nome completo é obrigatório');
@@ -218,6 +273,7 @@ export default function RegisterScreen() {
       formDataToSend.append('cpf', cpfLimpo);
       formDataToSend.append('senha', formData.senha);
       formDataToSend.append('tipo_usuario', formData.tipo_usuario);
+      
       if (foto) {
         const uriParts = foto.split('.');
         const fileType = uriParts[uriParts.length - 1] || 'jpg';
@@ -227,23 +283,28 @@ export default function RegisterScreen() {
           type: `image/${fileType}`,
         } as any);
       }
+
+      // Cadastro é público (sem token)
       const response = await fetch(`${USUARIOS_URL}/cadastro`, {
         method: 'POST',
         body: formDataToSend,
         headers: { 'Accept': 'application/json' },
       });
+      
       const data = await response.json();
       if (!response.ok) throw new Error(data.erro || 'Erro ao cadastrar');
-      Alert.alert('Sucesso', 'Usuário cadastrado com sucesso!');
+      
+      Alert.alert('✅ Sucesso', 'Usuário cadastrado com sucesso!');
       limparFormulario();
-      carregarUsuarios();
+      carregarUsuarios(); // Recarrega a lista com token
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      Alert.alert('❌ Erro', error.message);
     } finally {
       setSaving(false);
     }
   };
 
+  // 🔥 EDITAR COM TOKEN
   const handleEditar = async () => {
     if (!editingUser) return;
     if (!formData.nome_completo.trim()) {
@@ -254,11 +315,13 @@ export default function RegisterScreen() {
       Alert.alert('Erro', 'E-mail inválido');
       return;
     }
+    
     setSaving(true);
     try {
       const formDataToSend = new FormData();
       formDataToSend.append('nome_completo', formData.nome_completo.trim());
       formDataToSend.append('email', formData.email.trim().toLowerCase());
+      
       if (formData.senha && formData.senha.length > 0) {
         if (formData.senha.length < 4) {
           Alert.alert('Erro', 'Senha deve ter pelo menos 4 caracteres');
@@ -272,33 +335,57 @@ export default function RegisterScreen() {
         }
         formDataToSend.append('senha', formData.senha);
       }
-      const response = await fetch(`${USUARIOS_URL}/${editingUser.id}`, {
+
+      const response = await fetchWithToken(`${USUARIOS_URL}/${editingUser.id}`, {
         method: 'PUT',
         body: formDataToSend,
-        headers: { 'Accept': 'application/json' },
       });
+      
       const data = await response.json();
       if (!response.ok) throw new Error(data.erro || 'Erro ao atualizar');
-      Alert.alert('Sucesso', 'Usuário atualizado com sucesso!');
+      
+      Alert.alert('✅ Sucesso', 'Usuário atualizado com sucesso!');
       setModalVisible(false);
       setEditingUser(null);
       limparFormulario();
       carregarUsuarios();
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      console.error('❌ Erro ao editar:', error);
+      
+      if (error.message.includes('Sessão expirada')) {
+        Alert.alert('⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        router.replace('/login');
+      } else {
+        Alert.alert('❌ Erro', error.message || 'Erro ao atualizar');
+      }
     } finally {
       setSaving(false);
     }
   };
 
+  // 🔥 DELETAR COM TOKEN
   const handleDeletar = async (id: number) => {
     try {
-      const response = await fetch(`${USUARIOS_URL}/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Erro ao deletar');
-      Alert.alert('Sucesso', 'Usuário deletado com sucesso!');
+      const response = await fetchWithToken(`${USUARIOS_URL}/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.erro || 'Erro ao deletar');
+      }
+      
+      Alert.alert('✅ Sucesso', 'Usuário deletado com sucesso!');
       carregarUsuarios();
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      console.error('❌ Erro ao deletar:', error);
+      
+      if (error.message.includes('Sessão expirada')) {
+        Alert.alert('⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+        router.replace('/login');
+      } else {
+        Alert.alert('❌ Erro', error.message || 'Não foi possível deletar o usuário');
+      }
     }
   };
 
@@ -329,7 +416,7 @@ export default function RegisterScreen() {
   };
 
   const confirmarDelecao = (id: number) => {
-    setConfirmTitle('Confirmar exclusão');
+    setConfirmTitle('🗑️ Confirmar exclusão');
     setConfirmMessage('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.');
     setConfirmAction(() => () => handleDeletar(id));
     setConfirmModalVisible(true);
@@ -434,7 +521,11 @@ export default function RegisterScreen() {
           renderItem={renderUsuarioCard}
           contentContainerStyle={styles.listContainer}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={carregarUsuarios} colors={['#8B0000']} />
+            <RefreshControl 
+              refreshing={loading} 
+              onRefresh={carregarUsuarios} 
+              colors={['#8B0000']} 
+            />
           }
           ListHeaderComponent={
             <>
@@ -467,7 +558,7 @@ export default function RegisterScreen() {
 
               {/* FORMULÁRIO DE CADASTRO */}
               <View style={styles.formCard}>
-                <Text style={styles.formTitle}> Cadastrar Novo Usuário</Text>
+                <Text style={styles.formTitle}>📝 Cadastrar Novo Usuário</Text>
 
                 <View style={styles.fotoContainer}>
                   <TouchableOpacity
@@ -534,8 +625,8 @@ export default function RegisterScreen() {
                       style={styles.picker}
                       dropdownIconColor="#8B0000"
                     >
-                      <Picker.Item label="Paciente" value="0" />
-                      <Picker.Item label="Médico" value="1" />
+                      <Picker.Item label="👤 Paciente" value="0" />
+                      <Picker.Item label="👨‍⚕️ Médico" value="1" />
                     </Picker>
                   </View>
                 </View>
@@ -670,8 +761,8 @@ export default function RegisterScreen() {
                       style={styles.picker}
                       dropdownIconColor="#8B0000"
                     >
-                      <Picker.Item label="Paciente" value="0" />
-                      <Picker.Item label="Médico" value="1" />
+                      <Picker.Item label="👤 Paciente" value="0" />
+                      <Picker.Item label="👨‍⚕️ Médico" value="1" />
                     </Picker>
                   </View>
                 </View>
@@ -784,7 +875,7 @@ export default function RegisterScreen() {
           <Pressable style={styles.modalOverlayGlobal} onPress={() => setFotoModalVisible(false)}>
             <View style={styles.modalContainerGlobal}>
               <Pressable style={styles.modalContentGlobal} onPress={(e) => e.stopPropagation()}>
-                <Text style={styles.modalTitleGlobal}>Foto do Usuário</Text>
+                <Text style={styles.modalTitleGlobal}>📸 Foto do Usuário</Text>
                 {fotoModalUrl && (
                   <Image source={{ uri: fotoModalUrl }} style={styles.modalFoto} />
                 )}
