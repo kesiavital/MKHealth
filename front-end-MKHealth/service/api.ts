@@ -5,7 +5,7 @@
 
 // IP DO COMPUTADOR ONDE O BACKEND ESTÁ RODANDO
 // Altere apenas esta linha quando mudar de rede.
-const LOCAL_IP = "192.168.15.9";
+const LOCAL_IP = "192.168.0.12";
 
 const PORTA = "3000";
 
