@@ -11,9 +11,9 @@ export default function Index() {
   useEffect(() => {
     const verificarLogin = async () => {
       try {
-        console.log('🔍 ========================================');
-        console.log('🔍 VERIFICANDO AUTENTICAÇÃO');
-        console.log('🔍 ========================================');
+        console.log(' ========================================');
+        console.log('VERIFICANDO AUTENTICAÇÃO');
+        console.log(' ========================================');
         
         // Aguardar um pouco para garantir que o storage foi atualizado
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -21,18 +21,18 @@ export default function Index() {
         const token = await AsyncStorage.getItem('token');
         const usuario = await AsyncStorage.getItem('usuario');
         
-        console.log('🔑 Token:', token ? '✅ Presente' : '❌ Ausente');
-        console.log('👤 Usuário:', usuario ? '✅ Presente' : '❌ Ausente');
+        console.log(' Token:', token ? 'Presente' : 'Ausente');
+        console.log(' Usuário:', usuario ? 'Presente' : 'Ausente');
         
         if (token && usuario) {
-          console.log('✅ Usuário autenticado → HOME');
+          console.log(' Usuário autenticado → HOME');
           router.replace('/(tabs)');
         } else {
-          console.log('❌ Usuário NÃO autenticado → LOGIN');
+          console.log('Usuário NÃO autenticado → LOGIN');
           router.replace('/login');
         }
       } catch (error) {
-        console.error('❌ Erro:', error);
+        console.error('Erro:', error);
         router.replace('/login');
       } finally {
         setIsReady(true);

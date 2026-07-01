@@ -4,14 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as IntentLauncher from 'expo-intent-launcher';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,7 +20,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IP from '../../service/api';
@@ -141,11 +139,11 @@ export default function ExamesScreen() {
         const data = JSON.parse(userDataString);
         setUserData(data);
         setIsAdmin(data?.tipo_usuario === 1);
-        console.log('📱 Usuário carregado:', data);
-        console.log('📱 É admin?', data?.tipo_usuario === 1);
+        console.log('Usuário carregado:', data);
+        console.log('É admin?', data?.tipo_usuario === 1);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar usuário:', error);
+      console.error('Erro ao carregar usuário:', error);
     }
   };
 
@@ -170,7 +168,7 @@ export default function ExamesScreen() {
   const abrirModalPDF = (exame: Exame) => {
     setModalExamePdf(exame);
     setModalTipo('pdf');
-    setModalTitulo('📄 Visualizar PDF');
+    setModalTitulo('Visualizar PDF');
     setModalMensagem(`Deseja abrir o PDF do exame de ${exame.paciente_nome}?`);
     setModalBotaoTexto('Abrir PDF');
     setModalAcao(() => () => visualizarPDF(exame));
@@ -203,15 +201,15 @@ export default function ExamesScreen() {
           exame.paciente_nome?.toLowerCase().trim() === nomePaciente ||
           exame.paciente_cpf === userData.cpf
         );
-        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
+        console.log(`Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
       } else {
-        console.log(`📱 Médico - ${data.length} exames encontrados`);
+        console.log(`Médico - ${data.length} exames encontrados`);
       }
       
       setListaExames(examesFiltrados);
     } catch (error) {
-      console.error('❌ Erro ao carregar exames:', error);
-      abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
+      console.error(' Erro ao carregar exames:', error);
+      abrirModal('erro', 'Erro', 'Não foi possível carregar a lista de exames');
     } finally {
       setLoading(false);
     }
@@ -246,16 +244,16 @@ export default function ExamesScreen() {
       if (result.assets && result.assets[0]) {
         setNewPdfFile(result.assets[0]);
         setRemoverPdf(false);
-        abrirModal('sucesso', '✅ PDF Selecionado', 'PDF selecionado com sucesso!');
+        abrirModal('sucesso', 'PDF Selecionado', 'PDF selecionado com sucesso!');
       }
     } catch (error) {
-      abrirModal('erro', '❌ Erro', 'Não foi possível selecionar o PDF');
+      abrirModal('erro', 'Erro', 'Não foi possível selecionar o PDF');
     }
   };
 
   const confirmarRemoverPDF = () => {
     setModalTipo('confirmacao');
-    setModalTitulo('🗑️ Remover PDF');
+    setModalTitulo('Remover PDF');
     setModalMensagem('Tem certeza que deseja remover o PDF?');
     setModalBotaoTexto('Remover');
     setModalAcao(() => () => {
@@ -289,7 +287,7 @@ export default function ExamesScreen() {
 
   const salvarAlteracoes = async () => {
     if (!formData.paciente_nome.trim()) {
-      abrirModal('erro', '⚠️ Campo Obrigatório', 'Nome do paciente é obrigatório');
+      abrirModal('erro', 'Campo Obrigatório', 'Nome do paciente é obrigatório');
       return;
     }
 
@@ -334,13 +332,13 @@ export default function ExamesScreen() {
         throw new Error(data.erro || 'Erro ao atualizar exame');
       }
 
-      abrirModal('sucesso', '✅ Sucesso!', 'Exame atualizado com sucesso!', 'OK', () => {
+      abrirModal('sucesso', 'Sucesso!', 'Exame updated com sucesso!', 'OK', () => {
         setModalVisible(false);
         carregarExames();
       });
       
     } catch (error: any) {
-      abrirModal('erro', '❌ Erro', error.message || 'Erro ao atualizar');
+      abrirModal('erro', 'Erro', error.message || 'Erro ao atualizar');
     } finally {
       setSaving(false);
     }
@@ -348,15 +346,15 @@ export default function ExamesScreen() {
 
   const deletarExame = async (id: number) => {
     setModalTipo('confirmacao');
-    setModalTitulo('🗑️ Confirmar exclusão');
+    setModalTitulo('Confirmar exclusão');
     setModalMensagem('Deseja excluir este exame? Esta ação não pode ser desfeita.');
     setModalBotaoTexto('Excluir');
     setModalAcao(() => async () => {
       try {
         await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-        abrirModal('sucesso', '✅ Sucesso', 'Exame deletado com sucesso!', 'OK', () => carregarExames());
+        abrirModal('sucesso', 'Sucesso', 'Exame deletado com sucesso!', 'OK', () => carregarExames());
       } catch (error) {
-        abrirModal('erro', '❌ Erro', 'Não foi possível deletar o exame');
+        abrirModal('erro', 'Erro', 'Não foi possível deletar o exame');
       }
     });
     setModalBotaoSecundario({ texto: 'Cancelar', acao: () => {} });
@@ -366,7 +364,7 @@ export default function ExamesScreen() {
 
   const visualizarPDF = async (exame: Exame) => {
     if (!exame.possui_pdf) {
-      abrirModal('erro', '❌ Erro', 'Este exame não possui PDF');
+      abrirModal('erro', 'Erro', 'Este exame não possui PDF');
       return;
     }
 
@@ -374,7 +372,7 @@ export default function ExamesScreen() {
     
     try {
       const pdfUrl = `http://${IP}:3000/api/exames/${exame.id}/visualizar`;
-      console.log('📄 Abrindo PDF:', pdfUrl);
+      console.log('Abrindo PDF:', pdfUrl);
       
       const checkResponse = await fetch(pdfUrl, { method: 'HEAD' });
       console.log('Status da verificação:', checkResponse.status);
@@ -395,7 +393,7 @@ export default function ExamesScreen() {
       
     } catch (error) {
       console.error('Erro ao abrir PDF:', error);
-      abrirModal('erro', '❌ Erro', `Não foi possível abrir o PDF.\n\nURL: ${API_URL}/${exame.id}/visualizar`);
+      abrirModal('erro', 'Erro', `Não foi possível abrir o PDF.\n\nURL: ${API_URL}/${exame.id}/visualizar`);
     } finally {
       setOpeningId(null);
     }
@@ -407,12 +405,12 @@ export default function ExamesScreen() {
 
   const mostrarMenuExame = (exame: Exame) => {
     setModalTipo('confirmacao');
-    setModalTitulo('📋 Ações');
+    setModalTitulo('Ações');
     setModalMensagem(`O que deseja fazer com o exame de ${exame.paciente_nome}?`);
-    setModalBotaoTexto('✏️ Editar');
+    setModalBotaoTexto('Editar');
     setModalAcao(() => () => editarExame(exame));
     setModalBotaoSecundario({ 
-      texto: '🗑️ Excluir', 
+      texto: 'Excluir', 
       acao: () => deletarExame(exame.id) 
     });
     setModalExamePdf(null);
@@ -421,6 +419,11 @@ export default function ExamesScreen() {
 
   const formatarDataLista = (dataString: string) => {
     return new Date(dataString).toLocaleDateString('pt-BR');
+  };
+
+  const capitalizarNome = (texto?: string) => {
+    if (!texto) return '';
+    return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
   };
 
   useFocusEffect(
@@ -478,7 +481,7 @@ export default function ExamesScreen() {
             </Text>
           </View>
           <View style={styles.pacienteDetails}>
-            <Text style={styles.pacienteNome}>{item.paciente_nome}</Text>
+            <Text style={styles.pacienteNome}>{capitalizarNome(item.paciente_nome)}</Text>
             <Text style={styles.exameTipo}>{item.tipo_exame}</Text>
           </View>
         </View>
@@ -522,7 +525,7 @@ export default function ExamesScreen() {
           </View>
         )}
 
-        {item.possui_pdf && (
+        {item.possui_pdf ? (
           <TouchableOpacity 
             style={styles.pdfButton}
             onPress={() => mostrarMenuPDF(item)}
@@ -537,7 +540,7 @@ export default function ExamesScreen() {
               </>
             )}
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.cardFooter}>
@@ -559,31 +562,18 @@ export default function ExamesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <View style={styles.container}>
-        {/* 🔥 HEADER COM GRADIENTE E LOGO */}
-        <LinearGradient
-          colors={['#8B0000', '#A52A2A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <View style={styles.headerTop}>
-            <View style={styles.headerLeft}>
-              <MaterialCommunityIcons name="clipboard-list" size={28} color="#FFD700" />
-              <Text style={styles.headerTitle}>Meus Exames</Text>
-            </View>
-            <Image
-              source={require('../../assets/images/logomk.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.headerSubtitle}>
-            {listaExames.length} {listaExames.length === 1 ? 'exame' : 'exames'}
-            {!isAdmin && userData && ` • ${userData.nome_completo}`}
+        {/* HEADER COM COR SÓLIDA E LOGO GRANDE À DIREITA */}
+        {/* HEADER SIMPLIFICADO */}
+        <View style={styles.header}>
+          <Text style={styles.headerText}>
+            {isAdmin 
+              ? `Exames encontrados: ${listaExames.length}`
+              : `${capitalizarNome(userData?.nome_completo?.split(' ')[0] || 'Paciente')}, você tem ${listaExames.length} ${listaExames.length === 1 ? 'exame' : 'exames'}`
+            }
           </Text>
-        </LinearGradient>
+        </View>
 
         <FlatList
           data={listaExames}
@@ -684,7 +674,7 @@ export default function ExamesScreen() {
                   
                   {editingExame?.possui_pdf && !removerPdf && !newPdfFile && (
                     <View style={styles.currentPdf}>
-                      <Text>📄 {editingExame.pdf_nome}</Text>
+                      <Text> {editingExame.pdf_nome}</Text>
                       <TouchableOpacity onPress={confirmarRemoverPDF}>
                         <Text style={styles.removeText}>Remover</Text>
                       </TouchableOpacity>
@@ -805,7 +795,7 @@ export default function ExamesScreen() {
           />
         )}
 
-        {/* 🔥 MODAL UNIVERSAL ESTILIZADO */}
+        {/* MODAL UNIVERSAL ESTILIZADO */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -905,45 +895,42 @@ const styles = StyleSheet.create({
     marginTop: 10, 
     color: '#666' 
   },
-  
-  // 🔥 HEADER COM GRADIENTE E LOGO
+
+  // HEADER COM COR SÓLIDA E LOGO À DIREITA
+  // Substitua o seu objeto 'header' e 'headerLogo' dentro do StyleSheet pelos abaixo:
+
   header: {
-    paddingVertical: 20,
+    backgroundColor: '#8B0000',
+    paddingTop: 40, // Espaço para não bater no status bar
+    paddingBottom: 30, 
     paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    marginBottom: -15, // Mantém o efeito de "engolir"
+    zIndex: 1,
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
-    elevation: 6,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerLogo: {
-    width: 45,
-    height: 45,
-    tintColor: '#FFF',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  headerText: {
+    fontSize: 18,
     color: '#FFF',
+    fontWeight: '500',
+    textAlign: 'center',
     letterSpacing: 0.5,
   },
+  headerLogo: {
+    width: 60, // Reduzido de 85 para 60
+    height: 60, // Reduzido de 85 para 60
+    tintColor: '#FFF',
+  },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
+    fontSize: 16,
+    color: '#FFF',
+    marginTop: 5,
+    fontWeight: '500',
   },
 
   listContainer: { 
@@ -951,7 +938,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   
-  // 🔥 CARDS
+  // CARDS
   card: { 
     backgroundColor: '#FFF', 
     borderRadius: 14, 
@@ -1082,7 +1069,7 @@ const styles = StyleSheet.create({
     color: '#999' 
   },
   
-  // 🔥 EMPTY STATE
+  // EMPTY STATE
   emptyContainer: { 
     alignItems: 'center', 
     justifyContent: 'center', 
@@ -1101,7 +1088,7 @@ const styles = StyleSheet.create({
     textAlign: 'center' 
   },
   
-  // 🔥 MODAL DE EDIÇÃO
+  // MODAL DE EDIÇÃO
   modalOverlay: { 
     flex: 1, 
     backgroundColor: 'rgba(0,0,0,0.5)', 
@@ -1200,7 +1187,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold' 
   },
   
-  // 🔥 MODAIS DE SELEÇÃO
+  // MODAIS DE SELEÇÃO
   selectModalOverlay: { 
     flex: 1, 
     backgroundColor: 'rgba(0,0,0,0.5)', 
@@ -1235,7 +1222,7 @@ const styles = StyleSheet.create({
     color: '#333' 
   },
   
-  // 🔥 MODAL GLOBAL
+  // MODAL GLOBAL
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

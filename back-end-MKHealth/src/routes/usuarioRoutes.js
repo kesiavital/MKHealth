@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const usuarioController = require('../controllers/UsuarioController');
 const upload = require('../config/multer');
+const auth = require("../middleware/auth");
 
 // ============================================
 // 🔴 ATENÇÃO: ROTAS ESPECÍFICAS PRIMEIRO!
 // ============================================
 
 // 1. Rota de verificação
-router.get('/verificar', usuarioController.verificarUsuarios);
+router.get('/verificar', auth, usuarioController.verificarUsuarios);
 
 // 2. Cadastro
 router.post('/cadastro', upload.single('foto'), usuarioController.criar);
@@ -17,7 +18,7 @@ router.post('/cadastro', upload.single('foto'), usuarioController.criar);
 router.post('/login', usuarioController.logar);
 
 // 4. Listar todos
-router.get('/', usuarioController.listar);
+router.get('/', auth, usuarioController.listar);
 
 // ============================================
 // 🔥 ROTAS DE RECUPERAÇÃO DE SENHA
@@ -34,12 +35,12 @@ router.post('/redefinir-senha', usuarioController.redefinirSenha);
 // ============================================
 
 // 7. Buscar por ID
-router.get('/:id', usuarioController.buscarPorId);
+router.get('/:id', auth, usuarioController.buscarPorId);
 
 // 8. Atualizar foto
-router.put('/:id/foto', upload.single('foto'), usuarioController.atualizarFoto);
+router.put('/:id/foto', auth, upload.single('foto'), usuarioController.atualizarFoto);
 
 // 9. Deletar
-router.delete('/:id', usuarioController.deletar);
+router.delete('/:id', auth, usuarioController.deletar);
 
 module.exports = router;

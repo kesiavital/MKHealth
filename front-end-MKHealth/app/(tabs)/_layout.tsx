@@ -20,7 +20,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   const carregarUsuario = async () => {
     try {
-      // 🔥 FORÇAR RECARREGAR OS DADOS DO USUÁRIO
+      // FORÇAR RECARREGAR OS DADOS DO USUÁRIO
       const userDataString = await AsyncStorage.getItem('userData');
       if (userDataString) {
         const data = JSON.parse(userDataString);
@@ -32,11 +32,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         console.log('📱 TabBar - Nenhum usuário encontrado');
       }
     } catch (error) {
-      console.error('❌ TabBar - Erro ao carregar usuário:', error);
+      console.error('TabBar - Erro ao carregar usuário:', error);
     }
   };
 
-  // 🔥 REORGANIZA OS ITENS BASEADO NO TIPO DE USUÁRIO
+  // REORGANIZA OS ITENS BASEADO NO TIPO DE USUÁRIO
   const getOrderedRoutes = () => {
     const routes = [];
     
@@ -48,17 +48,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     if (homeRoute) routes.push(homeRoute);
     if (profileRoute) routes.push(profileRoute);
     
-    // 🔥 SÓ ADICIONA O BOTÃO DE NOVO EXAME SE FOR ADMIN
-    console.log('📱 TabBar - isAdmin:', isAdmin);
+    // SÓ ADICIONA O BOTÃO DE NOVO EXAME SE FOR ADMIN
+    console.log('TabBar - isAdmin:', isAdmin);
     if (isAdmin) {
       const cadastroRoute = state.routes.find((route: any) => route.name === 'cadastro-exame');
       if (cadastroRoute) routes.push(cadastroRoute);
-      console.log('📱 TabBar - Adicionou cadastro-exame');
+      console.log(' TabBar - Adicionou cadastro-exame');
     }
     
     if (examesRoute) routes.push(examesRoute);
     
-    console.log('📱 TabBar - Rotas finais:', routes.map(r => r?.name));
+    console.log(' TabBar - Rotas finais:', routes.map(r => r?.name));
     return routes.filter(Boolean);
   };
   
@@ -165,10 +165,10 @@ export default function TabLayout() {
       if (userDataString) {
         const data = JSON.parse(userDataString);
         setIsAdmin(data?.tipo_usuario === 1);
-        console.log('📱 TabLayout - É admin?', data?.tipo_usuario === 1);
+        console.log('TabLayout - É admin?', data?.tipo_usuario === 1);
       }
     } catch (error) {
-      console.error('❌ TabLayout - Erro:', error);
+      console.error('TabLayout - Erro:', error);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-
+//const auth = require('../middlewares/authMiddleware');//
 const exameController = require('../controllers/ExameController');
 const { upload } = require('../config/upload');
 
@@ -18,6 +18,8 @@ router.get('/health', (req, res) => {
 // ============================================
 // ROTAS DE BUSCA
 // ============================================
+
+router.get('/',exameController.listar); 
 
 router.get('/periodo', exameController.buscarPorPeriodo);
 

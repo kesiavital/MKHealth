@@ -16,8 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LineChart, PieChart, ProgressChart } from 'react-native-chart-kit';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import IP from '../../service/api';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -36,27 +35,6 @@ interface Exame {
   created_at: string;
 }
 
-interface Estatisticas {
-  total_exames: number;
-  total_pacientes: number;
-  total_medicos: number;
-  total_laboratorios: number;
-  exames_com_pdf: number;
-  percentual_com_pdf: number;
-  exames_este_mes: number;
-}
-
-interface ExamesPorMes {
-  mes: string;
-  quantidade: number;
-}
-
-interface ExamesPorTipo {
-  nome: string;
-  quantidade: number;
-  cor: string;
-}
-
 interface UserData {
   id: number;
   nome_completo: string;
@@ -64,6 +42,21 @@ interface UserData {
   cpf: string;
   tipo_usuario: number;
   foto: string | null;
+  checkups_concluidos?: number; // NOVO
+  ganhou_coroa?: boolean; // NOVO
+}
+
+interface EngajamentoData {
+  examesEsteAno: number;
+  preventivoText: string;
+  rotinaText: string;
+  expirandoText: string; 
+  atencaoText: string;
+  atencaoIcon: any; 
+  atencaoColor: string;
+  atencaoBg: string;
+  qtdEstrelas: number;
+  ganhouCoroa: boolean;
 }
 
 export default function DashboardScreen() {
@@ -71,12 +64,11 @@ export default function DashboardScreen() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [exames, setExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(false);
-  const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
   const [ultimosExames, setUltimosExames] = useState<Exame[]>([]);
-  const [examesPorMes, setExamesPorMes] = useState<ExamesPorMes[]>([]);
-  const [examesPorTipo, setExamesPorTipo] = useState<ExamesPorTipo[]>([]);
+  const [engajamento, setEngajamento] = useState<EngajamentoData | null>(null);
 
-  // 🔥 CARREGAR DADOS DO USUÁRIO
+  const insets = useSafeAreaInsets(); 
+
   useEffect(() => {
     carregarUsuario();
   }, []);
@@ -88,27 +80,21 @@ export default function DashboardScreen() {
         const data = JSON.parse(userDataString);
         setUserData(data);
         setIsAdmin(data?.tipo_usuario === 1);
-        console.log('📱 Dashboard - Usuário:', data?.nome_completo);
-        console.log('📱 Dashboard - É admin?', data?.tipo_usuario === 1);
-        console.log('📱 Dashboard - CPF:', data?.cpf);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar usuário:', error);
+      console.error('Erro ao carregar usuário:', error);
     }
   };
 
   const carregarDados = async () => {
-    console.log('🔄 Carregando dados...');
     setLoading(true);
     try {
       const response = await fetch(API_URL);
       const data: Exame[] = await response.json();
       
-      // 🔥 FILTRAR EXAMES BASEADO NO TIPO DE USUÁRIO
       let examesFiltrados = data;
       
       if (!isAdmin && userData) {
-        // Paciente vê apenas seus exames
         const nomePaciente = userData.nome_completo?.toLowerCase().trim();
         const cpfPaciente = userData.cpf?.replace(/\D/g, '');
         
@@ -117,98 +103,136 @@ export default function DashboardScreen() {
           const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
           return nomeExame === nomePaciente || cpfExame === cpfPaciente;
         });
-        
-        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
-      } else {
-        console.log(`📱 Médico - ${data.length} exames encontrados`);
       }
       
       setExames(examesFiltrados);
-      
-      // 🔥 CALCULAR ESTATÍSTICAS COM OS EXAMES FILTRADOS
-      calcularEstatisticas(examesFiltrados);
-      calcularDadosGraficos(examesFiltrados);
       
       const ultimos = [...examesFiltrados].sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ).slice(0, 5);
       setUltimosExames(ultimos);
+
+      calcularEngajamento(examesFiltrados);
       
-      console.log(`✅ ${examesFiltrados.length} exames carregados`);
     } catch (error) {
-      console.error('❌ Erro:', error);
+      console.error(' Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados');
     } finally {
       setLoading(false);
     }
   };
 
-  const calcularEstatisticas = (data: Exame[]) => {
-    const pacientesUnicos = new Set(data.map(e => e.paciente_nome));
-    const medicosUnicos = new Set(data.map(e => e.medico_solicitante));
-    const laboratoriosUnicos = new Set(data.map(e => e.laboratorio));
-    const examesComPdf = data.filter(e => e.possui_pdf).length;
-    
-    const agora = new Date();
-    const mesAtual = agora.getMonth();
-    const anoAtual = agora.getFullYear();
-    const examesEsteMes = data.filter(e => {
-      const dataExame = new Date(e.data_exame);
-      return dataExame.getMonth() === mesAtual && dataExame.getFullYear() === anoAtual;
-    }).length;
-    
-    setEstatisticas({
-      total_exames: data.length,
-      total_pacientes: pacientesUnicos.size,
-      total_medicos: medicosUnicos.size,
-      total_laboratorios: laboratoriosUnicos.size,
-      exames_com_pdf: examesComPdf,
-      percentual_com_pdf: data.length > 0 ? (examesComPdf / data.length) * 100 : 0,
-      exames_este_mes: examesEsteMes,
-    });
-  };
-
-  const calcularDadosGraficos = (data: Exame[]) => {
-    // Dados para gráfico de exames por mês (últimos 6 meses)
-    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const hoje = new Date();
-    const ultimos6Meses = [];
-    
-    for (let i = 5; i >= 0; i--) {
-      const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      ultimos6Meses.push(meses[data.getMonth()]);
+  const calcularEngajamento = (data: Exame[]) => {
+    if (data.length === 0) {
+      setEngajamento(null);
+      return;
     }
+
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const examesEsteAno = data.filter(e => new Date(e.data_exame).getFullYear() === anoAtual).length;
+
+    const preventivos = data.filter(e => e.tipo_exame === 'Check-Up Preventivo');
+    let preventivoText = "Seu próximo check-up Preventivo recomendado é Agora";
+
+    if (preventivos.length > 0) {
+      const ultimoPrev = [...preventivos].sort((a, b) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime())[0];
+      const proximaData = new Date(ultimoPrev.data_exame);
+      proximaData.setMonth(proximaData.getMonth() + 3);
+
+      const mesesStr = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      preventivoText = `Seu próximo check-up preventivo recomendado é em ${mesesStr[proximaData.getMonth()]}/${proximaData.getFullYear()}`;
+    }
+
+    const examesDoMaisNovoAoAntigo = [...data].sort((a, b) => new Date(b.data_exame).getTime() - new Date(a.data_exame).getTime());
+    const maisRecente = examesDoMaisNovoAoAntigo[0];
+    const dataMaisRecente = new Date(maisRecente.data_exame);
     
-    const examesPorMesData = ultimos6Meses.map((mes) => {
-      const mesIndex = meses.indexOf(mes);
-      const ano = hoje.getFullYear() - (mesIndex > hoje.getMonth() ? 1 : 0);
-      const quantidade = data.filter(e => {
-        const dataExame = new Date(e.data_exame);
-        return dataExame.getMonth() === mesIndex && dataExame.getFullYear() === ano;
-      }).length;
-      return { mes, quantidade };
+    let mesesAtras = (hoje.getFullYear() - dataMaisRecente.getFullYear()) * 12 + (hoje.getMonth() - dataMaisRecente.getMonth());
+    if (mesesAtras < 0) mesesAtras = 0;
+
+    const titulosRotina: { [key: string]: string } = {
+      'Check-Up Gym': 'Saúde Hipertrófica',
+      'Check-Up Preventivo': 'Saúde',
+      'Check-Up Veggie': 'Vitaminas e Minerais',
+      'Check-Up Sono': 'Saúde do sono',
+      'Check-Up Cardio': 'Saúde Cardiovascular'
+    };
+
+    const tituloRotina = titulosRotina[maisRecente.tipo_exame] || maisRecente.tipo_exame;
+    const rotinaText = `${tituloRotina} em dia — último exame há ${mesesAtras} mes(es)`;
+
+    const examesMaisAntigos = [...data].sort((a, b) => new Date(a.data_exame).getTime() - new Date(b.data_exame).getTime());
+
+    let expirandoText = "Nenhum check-up expirando no momento.";
+    
+    const exameQuaseExpirando = examesMaisAntigos.find(exame => {
+      const diffTempo = hoje.getTime() - new Date(exame.data_exame).getTime();
+      const diffDias = Math.floor(diffTempo / (1000 * 60 * 60 * 24));
+      const diasRestantes = 90 - diffDias;
+      
+      return diasRestantes >= 0 && diasRestantes <= 7;
     });
-    
-    setExamesPorMes(examesPorMesData);
-    
-    // Dados para gráfico de exames por tipo (top 5)
-    const tipoCount = new Map<string, number>();
-    data.forEach(exame => {
-      tipoCount.set(exame.tipo_exame, (tipoCount.get(exame.tipo_exame) || 0) + 1);
+
+    if (exameQuaseExpirando) {
+      const diffTempo = hoje.getTime() - new Date(exameQuaseExpirando.data_exame).getTime();
+      const diffDias = Math.floor(diffTempo / (1000 * 60 * 60 * 24));
+      const diasRestantes = 90 - diffDias;
+
+      expirandoText = `${exameQuaseExpirando.tipo_exame} — Expirando em ${diasRestantes} dia(s).`;
+    }
+
+    let atencaoText = "Tudo em dia! Nenhum exame expirado.";
+    let atencaoColor = "#4CAF50"; 
+    let atencaoBg = "#E8F5E9";
+    let atencaoIcon = "check-circle";
+
+    const exameExpirado = examesMaisAntigos.find(exame => {
+      const diffTempo = hoje.getTime() - new Date(exame.data_exame).getTime();
+      const diffDias = Math.floor(diffTempo / (1000 * 60 * 60 * 24));
+      return diffDias > 90; 
     });
+
+    if (exameExpirado) {
+      const diffTempo = hoje.getTime() - new Date(exameExpirado.data_exame).getTime();
+      const diffDias = Math.floor(diffTempo / (1000 * 60 * 60 * 24));
+      atencaoText = `${exameExpirado.tipo_exame} — Último há ${diffDias} dias.`;
+      atencaoColor = "#F44336"; 
+      atencaoBg = "#FFEBEE";
+      atencaoIcon = "alert-circle";
+    }
+
+    // === ADICIONADO: CONTROLE EXCLUSIVO DE COMBOS DA CLINICA ===
+    const combosOficiais = [
+      'Check-Up Preventivo',
+      'Check-Up Gym',
+      'Check-Up Veggie',
+      'Check-Up Cardio',
+      'Check-Up Sono'
+    ];
     
-    const sortedTipos = Array.from(tipoCount.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    // Mapeia todos os tipos únicos de exames que constam na lista do paciente
+    const tiposRealizados = new Set(data.map(e => e.tipo_exame));
     
-    const cores = ['#8B0000', '#D32F2F', '#F44336', '#FF5252', '#FF7961'];
-    const examesPorTipoData = sortedTipos.map(([nome, quantidade], index) => ({
-      nome: nome.length > 15 ? nome.substring(0, 12) + '...' : nome,
-      quantidade,
-      cor: cores[index % cores.length],
-    }));
+    // Filtra e conta quantos dos 5 combos o paciente possui
+    const qtdEstrelas = combosOficiais.filter(combo => tiposRealizados.has(combo)).length;
     
-    setExamesPorTipo(examesPorTipoData);
+    // Flag booleana que confere a coroa se os 5 forem diferentes
+    const ganhouCoroa = qtdEstrelas === 5;
+
+    setEngajamento({
+      examesEsteAno,
+      preventivoText,
+      rotinaText,
+      expirandoText, 
+      atencaoText,
+      atencaoColor,
+      atencaoBg,
+      atencaoIcon,
+      // Passando as novas propriedades computadas para o estado
+      qtdEstrelas,
+      ganhouCoroa
+    });
   };
 
   useFocusEffect(
@@ -224,55 +248,34 @@ export default function DashboardScreen() {
     return data.toLocaleDateString('pt-BR');
   };
 
-  // Prepara dados para o gráfico de linha
-  const lineChartData = {
-    labels: examesPorMes.map(item => item.mes),
-    datasets: [{
-      data: examesPorMes.map(item => item.quantidade),
-      color: (opacity = 1) => `rgba(139, 0, 0, ${opacity})`,
-      strokeWidth: 2
-    }]
-  };
-
-  // Prepara dados para o gráfico de pizza
-  const pieChartData = examesPorTipo.map(item => ({
-    name: item.nome,
-    population: item.quantidade,
-    color: item.cor,
-    legendFontColor: '#333',
-    legendFontSize: 11
-  }));
-
-  // Prepara dados para o gráfico de progresso (PDF vs Sem PDF)
-  const progressChartData = {
-    labels: ['Com PDF', 'Sem PDF'],
-    data: estatisticas ? [
-      estatisticas.percentual_com_pdf / 100,
-      (100 - estatisticas.percentual_com_pdf) / 100
-    ] : [0, 0]
-  };
-
-  const chartConfig = {
-    backgroundColor: '#FFF',
-    backgroundGradientFrom: '#FFF',
-    backgroundGradientTo: '#FFF',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(139, 0, 0, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(51, 51, 51, ${opacity})`,
-    style: {
-      borderRadius: 16
-    },
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: '#8B0000'
-    }
+  const capitalizarNome = (texto?: string) => {
+    if (!texto) return '';
+    return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
   };
 
   const hasData = exames.length > 0;
 
+  // NOVA FUNÇÃO: Renderizar estrelas
+  const renderEstrelas = () => {
+    const total = engajamento?.qtdEstrelas || 0;
+    let estrelas = [];
+    
+    for (let i = 1; i <= 5; i++) {
+      estrelas.push(
+        <MaterialCommunityIcons 
+          key={i} 
+          name="star" 
+          size={32} // Estrelas grandes e bonitas
+          color={i <= total ? "#FFD700" : "#E0E0E0"} // Amarelo se completou, Cinza se não
+          style={{ marginHorizontal: 4 }}
+        />
+      );
+    }
+    return estrelas;
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}> 
       <StatusBar style="light" backgroundColor="#8B0000" />
       
       <ScrollView 
@@ -281,186 +284,219 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={loading} onRefresh={carregarDados} colors={['#8B0000']} />
         }
       >
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerWelcome}>
-            {isAdmin ? '📊 Dashboard Médico' : '📊 Meus Exames'}
-          </Text>
+        <View style={styles.headerContainer}> 
           <View style={styles.userInfo}>
-            <MaterialCommunityIcons name="account-circle" size={50} color="#DDD" />
+            {/* AVATAR COM A COROA */}
+            <View style={{ position: 'relative' }}>
+              <MaterialCommunityIcons name="account-circle" size={50} color="#DDD" />
+              {engajamento?.ganhouCoroa && !isAdmin && (
+                <View style={styles.coroaWrapper}>
+                  <MaterialCommunityIcons name="crown" size={24} color="#FFD700" />
+                </View>
+              )}
+            </View>
             <View style={{ marginLeft: 10 }}>
               <Text style={styles.userName}>
-                {userData?.nome_completo || 'Sistema MKHealth'}
+                {userData?.nome_completo ? capitalizarNome(userData.nome_completo) : 'Sistema MKHealth'}
               </Text>
               <Text style={styles.userCpf}>
-                {isAdmin ? '👨‍⚕️ Médico - Todos os exames' : '👤 Paciente - Meus exames'}
+                {isAdmin ? 'Visão Administrativa' : 'Paciente - Meus exames'}
               </Text>
             </View>
             <Image source={require('../../assets/images/logomk.png')} style={styles.logoRight} />
           </View>
         </View>
 
-        {hasData && estatisticas && (
-          <>
-            <View style={styles.statsContainer}>
-              <Text style={styles.sectionTitle}>
-                {isAdmin ? '📊 Estatísticas Gerais' : '📊 Minhas Estatísticas'}
-              </Text>
-              
-              <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <MaterialCommunityIcons name="file-document" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.total_exames}</Text>
-                  <Text style={styles.statLabel}>Total Exames</Text>
-                </View>
-                
-                <View style={styles.statCard}>
-                  <MaterialCommunityIcons name="account-group" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.total_pacientes}</Text>
-                  <Text style={styles.statLabel}>Pacientes</Text>
-                </View>
-                
-                {isAdmin && (
-                  <>
-                    <View style={styles.statCard}>
-                      <MaterialCommunityIcons name="doctor" size={28} color="#8B0000" />
-                      <Text style={styles.statNumber}>{estatisticas.total_medicos}</Text>
-                      <Text style={styles.statLabel}>Médicos</Text>
-                    </View>
-                    
-                    <View style={styles.statCard}>
-                      <MaterialCommunityIcons name="flask" size={28} color="#8B0000" />
-                      <Text style={styles.statNumber}>{estatisticas.total_laboratorios}</Text>
-                      <Text style={styles.statLabel}>Laboratórios</Text>
-                    </View>
-                  </>
-                )}
+        {/* MENSAGEM DE BOAS-VINDAS */}
+        <View style={styles.welcomeBanner}>
+          <Text style={styles.welcomeTitle}>
+            Olá, {userData?.nome_completo ? capitalizarNome(userData.nome_completo.split(' ')[0]) : 'Paciente'}! 👋
+          </Text>
+          <Text style={styles.welcomeSub}>
+            {hasData && !isAdmin
+              ? 'Acompanhe seu status de rotina e mantenha sua saúde sempre em dia.'
+              : 'Bem-vindo ao MK Health! Aqui você poderá acompanhar os resultados e a evolução de todos os seus exames laboratoriais.'
+            }
+          </Text>
+        </View>
+
+        {/* CARDS INFORMATIVOS DOS 5 COMBOS */}
+        {!hasData && !isAdmin && (
+          <View style={styles.combosInfoContainer}>
+            <Text style={styles.combosSectionTitle}>📋 Conheça nossos Check-ups</Text>
+            <Text style={styles.combosSectionSub}>
+              Assim que realizar um dos nossos combos na clínica, este espaço liberará seu painel inteligente de engajamento!
+            </Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.combosCarousel}>
+              <View style={[styles.comboPreviewCard, { borderLeftColor: '#4CAF50' }]}>
+                <MaterialCommunityIcons name="dumbbell" size={24} color="#4CAF50" />
+                <Text style={styles.comboPreviewName}>Check-Up Gym</Text>
+                <Text style={styles.comboPreviewDesc}>Foco em performance e hipertrofia.</Text>
               </View>
 
-              <View style={styles.statsRow}>
-                <View style={styles.statCardHalf}>
-                  <MaterialCommunityIcons name="file-pdf-box" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.exames_com_pdf}</Text>
-                  <Text style={styles.statLabel}>Exames com PDF</Text>
-                  <Text style={styles.statPercent}>{estatisticas.percentual_com_pdf.toFixed(1)}%</Text>
+              <View style={[styles.comboPreviewCard, { borderLeftColor: '#FF9800' }]}>
+                <MaterialCommunityIcons name="sprout" size={24} color="#FF9800" />
+                <Text style={styles.comboPreviewName}>Check-Up Veggie</Text>
+                <Text style={styles.comboPreviewDesc}>Controle nutricional especializado.</Text>
+              </View>
+
+              <View style={[styles.comboPreviewCard, { borderLeftColor: '#F44336' }]}>
+                <MaterialCommunityIcons name="heart-pulse" size={24} color="#F44336" />
+                <Text style={styles.comboPreviewName}>Check-Up Cardio</Text>
+                <Text style={styles.comboPreviewDesc}>Prevenção e saúde do coração.</Text>
+              </View>
+
+              <View style={[styles.comboPreviewCard, { borderLeftColor: '#9C27B0' }]}>
+                <MaterialCommunityIcons name="brain" size={24} color="#9C27B0" />
+                <Text style={styles.comboPreviewName}>Check-Up Sono</Text>
+                <Text style={styles.comboPreviewDesc}>Mapeie fadiga, estresse e sono.</Text>
+              </View>
+
+             <View style={[styles.comboPreviewCard, { borderLeftColor: '#E91E63' }]}>
+                <MaterialCommunityIcons name="clipboard-pulse" size={24} color="#E91E63" />
+                <Text style={styles.comboPreviewName}>Check-Up Preventivo</Text>
+                <Text style={styles.comboPreviewDesc}>Mapeamento Geral.</Text>
+             </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* PAINEL DE ENGAJAMENTO (GAMIFICAÇÃO E STATUS) */}
+        {hasData && engajamento && !isAdmin && (
+          <>
+            <View style={styles.gamificationContainer}>
+              {/* ========================================== */}
+              {/* NOVO CARD EXCLUSIVO DE ESTRELAS E COMBOS */}
+              {/* ========================================== */}
+              <View style={[styles.gamificationCard, { borderLeftColor: '#9C27B0', marginBottom: 10 }]}>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={[styles.gamificationText, { textAlign: 'center', marginBottom: 10 }]}>
+                    Desbloqueie conquistas! Você fez <Text style={styles.boldText}>{engajamento.qtdEstrelas} de 5</Text> combos.
+                  </Text>
+                  
+                  {/* Container que chama as 5 estrelas lado a lado */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
+                    {renderEstrelas()}
+                  </View>
+                  
+                  <Text style={{ fontSize: 12, color: '#666', marginTop: 10, fontStyle: 'italic', textAlign: 'center' }}>
+                    {engajamento.qtdEstrelas >= 5 
+                      ? "Você conquistou a Coroa de Prevenção 👑 !" 
+                      : "Faça combos de exames diferentes para liberar estrelas!"}
+                  </Text>
                 </View>
-                
-                <View style={styles.statCardHalf}>
-                  <MaterialCommunityIcons name="calendar-today" size={28} color="#8B0000" />
-                  <Text style={styles.statNumber}>{estatisticas.exames_este_mes}</Text>
-                  <Text style={styles.statLabel}>Exames este mês</Text>
+              </View>
+              {/* ========================================== */}
+              <View style={styles.gamificationCard}>
+                <MaterialCommunityIcons name="trophy-award" size={32} color="#FFD700" />
+                <View style={styles.gamificationTextWrapper}>
+                  <Text style={styles.gamificationText}>
+                    Você realizou <Text style={styles.boldText}>{engajamento.examesEsteAno} check-ups</Text> este ano. Parabéns por cuidar da saúde!
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.gamificationCard, { borderLeftColor: '#2196F3', marginTop: 10 }]}>
+                <MaterialCommunityIcons name="calendar-clock" size={32} color="#2196F3" />
+                <View style={styles.gamificationTextWrapper}>
+                  <Text style={styles.gamificationText}>
+                    {engajamento.preventivoText}
+                  </Text>
                 </View>
               </View>
             </View>
 
-            {/* GRÁFICO DE LINHA - Exames por Mês */}
-            {examesPorMes.length > 0 && examesPorMes.some(item => item.quantidade > 0) && (
-              <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>
-                  📈 {isAdmin ? 'Evolução de Exames' : 'Meus Exames por Mês'} (Últimos 6 meses)
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <LineChart
-                    data={lineChartData}
-                    width={Math.max(screenWidth - 40, examesPorMes.length * 70)}
-                    height={220}
-                    chartConfig={chartConfig}
-                    bezier
-                    style={styles.chart}
-                    formatYLabel={(value) => Math.floor(Number(value)).toString()}
-                    fromZero
-                  />
-                </ScrollView>
+            <View style={styles.statusRotinaContainer}>
+              <Text style={styles.sectionTitle}>Status de Rotina</Text>
+              
+              <View style={styles.statusItem}>
+                <View style={[styles.statusIconBg, { backgroundColor: '#E8F5E9' }]}>
+                  <MaterialCommunityIcons name="check-circle" size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.statusTextContainer}>
+                  <Text style={styles.statusTitle}>Exames em Dia</Text>
+                  <Text style={styles.statusSubtitle}>{engajamento.rotinaText}</Text>
+                </View>
               </View>
-            )}
 
-            {/* GRÁFICO DE PIZZA - Tipos de Exame */}
-            {pieChartData.length > 0 && (
-              <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>
-                  🥧 {isAdmin ? 'Distribuição por Tipo de Exame' : 'Meus Tipos de Exame'}
-                </Text>
-                <PieChart
-                  data={pieChartData}
-                  width={screenWidth - 30}
-                  height={220}
-                  chartConfig={chartConfig}
-                  accessor="population"
-                  backgroundColor="transparent"
-                  paddingLeft="15"
-                  absolute
-                />
+              {/* CARD DE EXAMES EXPIRANDO */}
+              <View style={styles.statusItem}>
+                <View style={[styles.statusIconBg, { backgroundColor: '#FFF3E0' }]}>
+                  <MaterialCommunityIcons name="clock-alert" size={24} color="#FF9800" />
+                </View>
+                <View style={styles.statusTextContainer}>
+                  <Text style={styles.statusTitle}>Exames Expirando</Text>
+                  <Text style={styles.statusSubtitle}>{engajamento.expirandoText}</Text>
+                </View>
               </View>
-            )}
 
-            {/* GRÁFICO DE PROGRESSO - PDF vs Sem PDF */}
-            {estatisticas && estatisticas.total_exames > 0 && (
-              <View style={styles.chartContainer}>
-                <Text style={styles.sectionTitle}>
-                  📄 {isAdmin ? 'Proporção de Exames com PDF' : 'Meus Exames com PDF'}
-                </Text>
-                <ProgressChart
-                  data={progressChartData}
-                  width={screenWidth - 30}
-                  height={160}
-                  chartConfig={chartConfig}
-                  style={styles.chart}
-                />
-                <Text style={styles.chartNote}>
-                  {estatisticas.exames_com_pdf} de {estatisticas.total_exames} exames possuem PDF
-                </Text>
+              <View style={styles.statusItem}>
+                <View style={[styles.statusIconBg, { backgroundColor: engajamento.atencaoBg }]}>
+                  <MaterialCommunityIcons name={engajamento.atencaoIcon} size={24} color={engajamento.atencaoColor} />
+                </View>
+                <View style={styles.statusTextContainer}>
+                  <Text style={styles.statusTitle}>Atenção</Text>
+                  <Text style={styles.statusSubtitle}>{engajamento.atencaoText}</Text>
+                </View>
               </View>
-            )}
-
-            {ultimosExames.length > 0 && (
-              <View style={styles.ultimosContainer}>
-                <Text style={styles.sectionTitle}>
-                  📋 {isAdmin ? 'Últimos Exames' : 'Meus Últimos Exames'}
-                </Text>
-                {ultimosExames.map((exame, index) => (
-                  <TouchableOpacity 
-                    key={index} 
-                    style={styles.ultimoItem}
-                    onPress={() => router.push('/exames')}
-                  >
-                    <View style={styles.ultimoIcon}>
-                      <MaterialCommunityIcons name="account" size={20} color="#8B0000" />
-                    </View>
-                    <View style={styles.ultimoInfo}>
-                      <Text style={styles.ultimoNome}>{exame.paciente_nome}</Text>
-                      <Text style={styles.ultimoDetalhe}>{exame.tipo_exame} • {formatarData(exame.data_exame)}</Text>
-                    </View>
-                    {exame.possui_pdf && (
-                      <MaterialCommunityIcons name="file-pdf-box" size={20} color="#FF4444" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            </View>
           </>
         )}
 
+        {/* ÚLTIMOS EXAMES */}
+        {ultimosExames.length > 0 && (
+          <View style={styles.ultimosContainer}>
+            <Text style={styles.sectionTitle}>
+               {isAdmin ? 'Últimos Exames Cadastrados' : 'Meus Últimos Exames'}
+            </Text>
+            {ultimosExames.map((exame, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.ultimoItem}
+                onPress={() => router.push('/exames')}
+              >
+                <View style={styles.ultimoIcon}>
+                  <MaterialCommunityIcons name="flask-outline" size={24} color="#8B0000" />
+                </View>
+                <View style={styles.ultimoInfo}>
+                  {isAdmin && <Text style={styles.ultimoNome}>{capitalizarNome(exame.paciente_nome)}</Text>}
+                  <Text style={isAdmin ? styles.ultimoDetalheBold : styles.ultimoNome}>
+                    {exame.tipo_exame}
+                  </Text>
+                  <Text style={styles.ultimoDetalhe}>{formatarData(exame.data_exame)} • {exame.laboratorio}</Text>
+                </View>
+                {exame.possui_pdf ? (
+                  <MaterialCommunityIcons name="file-pdf-box" size={24} color="#FF4444" />
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* TELA DE RETORNO VAZIA */}
         {!hasData && !loading && (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="file-document-outline" size={80} color="#CCCCCC" />
-            <Text style={styles.emptyTitle}>Nenhum exame encontrado</Text>
+            <MaterialCommunityIcons name="file-document-outline" size={60} color="#CCCCCC" />
+            <Text style={styles.emptyTitle}>Histórico Clínico Vazio</Text>
             <Text style={styles.emptyText}>
-              {isAdmin ? 'Cadastre o primeiro exame' : 'Aguardando cadastro de exames'}
+              {isAdmin ? 'Nenhum exame foi cadastrado no banco ainda.' : 'Nenhum registro associado ao seu CPF foi inserido até o momento.'}
             </Text>
             {isAdmin && (
               <TouchableOpacity 
                 style={styles.emptyButton}
                 onPress={() => router.push('/cadastro-exame')}
               >
-                <Text style={styles.emptyButtonText}>Cadastrar Exame</Text>
+                <Text style={styles.emptyButtonText}>Cadastrar Novo Exame</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {loading && !estatisticas && (
+        {loading && exames.length === 0 && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#8B0000" />
-            <Text style={styles.loadingText}>Carregando estatísticas...</Text>
+            <Text style={styles.loadingText}>Carregando dados...</Text>
           </View>
         )}
       </ScrollView>
@@ -475,74 +511,94 @@ const styles = StyleSheet.create({
   headerContainer: { 
     backgroundColor: '#8B0000', 
     padding: 20, 
+    paddingTop: 15, 
     paddingBottom: 30, 
     borderBottomLeftRadius: 20, 
     borderBottomRightRadius: 20 
   },
-  headerWelcome: { color: '#FFF', textAlign: 'center', fontSize: 22, marginBottom: 20, fontWeight: 'bold' },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
   userName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   userCpf: { color: '#DDD', fontSize: 12 },
-  logoRight: { width: 70, height: 70, resizeMode: 'contain', marginLeft: 'auto', tintColor: '#FFF' },
-  
-  statsContainer: { 
-    backgroundColor: '#FFF', 
-    margin: 15, 
-    marginTop: 20, 
-    borderRadius: 15, 
+  // AJUSTADO: Aumentado o tamanho de 70 para 85 para dar mais destaque visual
+  logoRight: { width: 85, height: 85, resizeMode: 'contain', marginLeft: 'auto', tintColor: '#FFF' },
+   
+   coroaWrapper: {
+    position: 'absolute',
+    top: -10,
+    right: -5, //voce editou aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+    transform: [{ rotate: '15deg' }],
+  },
+
+  welcomeBanner: {
+    backgroundColor: '#FFF',
+    margin: 15,
+    borderRadius: 15,
     padding: 15,
-    elevation: 3,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
   },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
-  statsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  statCard: { 
-    width: '23%', 
-    alignItems: 'center', 
-    padding: 10,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 10,
-  },
-  statCardHalf: {
-    width: '48%',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 10,
-  },
-  statNumber: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginTop: 5 
-  },
-  statLabel: { 
-    fontSize: 11, 
-    color: '#666', 
-    textAlign: 'center',
-    marginTop: 3,
-  },
-  statPercent: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-    marginTop: 3,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  welcomeTitle: { fontSize: 18, fontWeight: 'bold', color: '#8B0000', marginBottom: 5 },
+  welcomeSub: { fontSize: 13, color: '#555', lineHeight: 18 },
+
+  combosInfoContainer: {
+    margin: 15,
     marginTop: 5,
   },
-  
-  chartContainer: {
+  combosSectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#333', marginBottom: 4 },
+  combosSectionSub: { fontSize: 12, color: '#666', marginBottom: 12 },
+  combosCarousel: { flexDirection: 'row', paddingVertical: 5 },
+  comboPreviewCard: {
+    backgroundColor: '#FFF',
+    width: 180,
+    padding: 12,
+    borderRadius: 12,
+    marginRight: 12,
+    borderLeftWidth: 5,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  comboPreviewName: { fontSize: 14, fontWeight: 'bold', color: '#333', marginTop: 6, marginBottom: 4 },
+  comboPreviewDesc: { fontSize: 11, color: '#666', lineHeight: 14 },
+
+  gamificationContainer: {
+    marginHorizontal: 15,
+    marginBottom: 15,
+  },
+  gamificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    padding: 15,
+    borderRadius: 12,
+    borderLeftWidth: 5,
+    borderLeftColor: '#FFD700',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  gamificationTextWrapper: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  gamificationText: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+  },
+  boldText: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+
+  statusRotinaContainer: {
     backgroundColor: '#FFF',
     margin: 15,
     marginTop: 0,
@@ -554,17 +610,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
   },
-  chartNote: {
-    textAlign: 'center',
+  statusIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  statusTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  statusSubtitle: {
     fontSize: 12,
     color: '#666',
-    marginTop: 10,
+    lineHeight: 16,
   },
-  
+
   ultimosContainer: {
     backgroundColor: '#FFF',
     margin: 15,
@@ -585,17 +659,27 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   ultimoIcon: {
-    width: 35,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF5F5',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ultimoInfo: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   ultimoNome: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#333',
+  },
+  ultimoDetalheBold: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#444',
+    marginTop: 2,
   },
   ultimoDetalhe: {
     fontSize: 12,
@@ -616,22 +700,23 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 40,
     backgroundColor: '#FFF',
     margin: 15,
     borderRadius: 15,
     padding: 30,
+    elevation: 1,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#999',
-    marginTop: 16,
+    marginTop: 12,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#CCC',
-    marginTop: 8,
+    fontSize: 13,
+    color: '#BBB',
+    marginTop: 6,
     textAlign: 'center',
   },
   emptyButton: {

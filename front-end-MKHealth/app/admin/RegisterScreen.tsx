@@ -139,9 +139,9 @@ export default function RegisterScreen() {
       'Escolha uma opção',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: '📷 Tirar Foto', onPress: tirarFoto },
-        { text: '🖼️ Escolher da Galeria', onPress: escolherFotoGaleria },
-        ...(foto ? [{ text: '🗑️ Remover Foto', onPress: removerFoto, style: 'destructive' as const }] : [])
+        { text: 'Tirar Foto', onPress: tirarFoto },
+        { text: ' Escolher da Galeria', onPress: escolherFotoGaleria },
+        ...(foto ? [{ text: 'Remover Foto', onPress: removerFoto, style: 'destructive' as const }] : [])
       ]
     );
   };
@@ -183,7 +183,7 @@ export default function RegisterScreen() {
       const data = await response.json();
       setUsuarios(data);
     } catch (error) {
-      console.error('❌ Erro ao carregar usuários:', error);
+      console.error('Erro ao carregar usuários:', error);
     }
   };
 
@@ -234,11 +234,11 @@ export default function RegisterScreen() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.erro || 'Erro ao cadastrar');
-      Alert.alert('✅ Sucesso', 'Usuário cadastrado com sucesso!');
+      Alert.alert('Sucesso', 'Usuário cadastrado com sucesso!');
       limparFormulario();
       carregarUsuarios();
     } catch (error: any) {
-      Alert.alert('❌ Erro', error.message);
+      Alert.alert('Erro', error.message);
     } finally {
       setSaving(false);
     }
@@ -279,13 +279,13 @@ export default function RegisterScreen() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.erro || 'Erro ao atualizar');
-      Alert.alert('✅ Sucesso', 'Usuário atualizado com sucesso!');
+      Alert.alert('Sucesso', 'Usuário atualizado com sucesso!');
       setModalVisible(false);
       setEditingUser(null);
       limparFormulario();
       carregarUsuarios();
     } catch (error: any) {
-      Alert.alert('❌ Erro', error.message);
+      Alert.alert('Erro', error.message);
     } finally {
       setSaving(false);
     }
@@ -295,10 +295,10 @@ export default function RegisterScreen() {
     try {
       const response = await fetch(`${USUARIOS_URL}/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Erro ao deletar');
-      Alert.alert('✅ Sucesso', 'Usuário deletado com sucesso!');
+      Alert.alert('Sucesso', 'Usuário deletado com sucesso!');
       carregarUsuarios();
     } catch (error: any) {
-      Alert.alert('❌ Erro', error.message);
+      Alert.alert('Erro', error.message);
     }
   };
 
@@ -329,7 +329,7 @@ export default function RegisterScreen() {
   };
 
   const confirmarDelecao = (id: number) => {
-    setConfirmTitle('🗑️ Confirmar exclusão');
+    setConfirmTitle('Confirmar exclusão');
     setConfirmMessage('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.');
     setConfirmAction(() => () => handleDeletar(id));
     setConfirmModalVisible(true);
@@ -467,7 +467,7 @@ export default function RegisterScreen() {
 
               {/* FORMULÁRIO DE CADASTRO */}
               <View style={styles.formCard}>
-                <Text style={styles.formTitle}>📝 Cadastrar Novo Usuário</Text>
+                <Text style={styles.formTitle}> Cadastrar Novo Usuário</Text>
 
                 <View style={styles.fotoContainer}>
                   <TouchableOpacity
@@ -534,8 +534,8 @@ export default function RegisterScreen() {
                       style={styles.picker}
                       dropdownIconColor="#8B0000"
                     >
-                      <Picker.Item label="👤 Paciente" value="0" />
-                      <Picker.Item label="👨‍⚕️ Médico" value="1" />
+                      <Picker.Item label="Paciente" value="0" />
+                      <Picker.Item label="Médico" value="1" />
                     </Picker>
                   </View>
                 </View>
@@ -670,8 +670,8 @@ export default function RegisterScreen() {
                       style={styles.picker}
                       dropdownIconColor="#8B0000"
                     >
-                      <Picker.Item label="👤 Paciente" value="0" />
-                      <Picker.Item label="👨‍⚕️ Médico" value="1" />
+                      <Picker.Item label="Paciente" value="0" />
+                      <Picker.Item label="Médico" value="1" />
                     </Picker>
                   </View>
                 </View>
@@ -784,7 +784,7 @@ export default function RegisterScreen() {
           <Pressable style={styles.modalOverlayGlobal} onPress={() => setFotoModalVisible(false)}>
             <View style={styles.modalContainerGlobal}>
               <Pressable style={styles.modalContentGlobal} onPress={(e) => e.stopPropagation()}>
-                <Text style={styles.modalTitleGlobal}>📸 Foto do Usuário</Text>
+                <Text style={styles.modalTitleGlobal}>Foto do Usuário</Text>
                 {fotoModalUrl && (
                   <Image source={{ uri: fotoModalUrl }} style={styles.modalFoto} />
                 )}

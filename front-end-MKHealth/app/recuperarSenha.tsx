@@ -28,11 +28,8 @@ export default function RecuperarSenhaScreen() {
   const [showNovaSenha, setShowNovaSenha] = useState(false);
   const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
   const [codigo, setCodigo] = useState('');
-  const [codigoGerado, setCodigoGerado] = useState('');
-  const [usuarioId, setUsuarioId] = useState<number | null>(null);
   
   const [modalVisible, setModalVisible] = useState(false);
-  const [codigoModal, setCodigoModal] = useState('');
   const [modalTipo, setModalTipo] = useState<'sucesso' | 'erro' | 'info' | 'confirmacao'>('info');
   const [modalTitulo, setModalTitulo] = useState('');
   const [modalMensagem, setModalMensagem] = useState('');
@@ -43,10 +40,6 @@ export default function RecuperarSenhaScreen() {
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
-  };
-
-  const gerarCodigo = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
   const abrirModal = (
@@ -73,24 +66,11 @@ export default function RecuperarSenhaScreen() {
     }
   };
 
-  const abrirModalCodigo = (codigo: string) => {
-    setCodigoModal(codigo);
-    setModalTipo('info');
-    setModalTitulo('📧 Código Enviado!');
-    setModalMensagem('');
-    setModalBotaoTexto('ENTENDI, IR PARA O PASSO 2');
-    setModalAcao(() => () => {
-      setStep(2);
-    });
-    setModalBotaoSecundario(null);
-    setModalVisible(true);
-  };
-
   const handleVerificarEmail = async () => {
     if (!email.trim()) {
       abrirModal(
         'erro',
-        '⚠️ Campo Vazio',
+        'Campo Vazio',
         'Por favor, digite seu e-mail para continuar.'
       );
       return;
@@ -99,7 +79,7 @@ export default function RecuperarSenhaScreen() {
     if (!validateEmail(email.trim())) {
       abrirModal(
         'erro',
-        '📧 E-mail Inválido',
+        'E-mail Inválido',
         'Por favor, digite um endereço de e-mail válido.\n\nExemplo: usuario@email.com'
       );
       return;
@@ -110,7 +90,7 @@ export default function RecuperarSenhaScreen() {
     try {
       const url = `${USUARIOS_URL}/verificar-email`;
       
-      console.log('📡 Verificando email:', email.trim());
+      console.log('Verificando email:', email.trim());
 
       const response = await fetch(url, {
         method: 'POST',
@@ -124,12 +104,12 @@ export default function RecuperarSenhaScreen() {
       });
 
       const data = await response.json();
-      console.log('📡 Resposta:', data);
+      console.log('Resposta:', data);
 
       if (response.status === 404) {
         abrirModal(
           'erro',
-          '🔍 E-mail não encontrado',
+          'E-mail não encontrado',
           'Este e-mail não está cadastrado em nossa base de dados.\n\nVerifique o e-mail informado e tente novamente.',
           'Tentar Novamente',
           undefined,
@@ -145,25 +125,27 @@ export default function RecuperarSenhaScreen() {
       if (!response.ok) {
         abrirModal(
           'erro',
-          '❌ Erro na Verificação',
+          'Erro na Verificação',
           data.erro || 'Ocorreu um erro ao verificar seu e-mail. Tente novamente.'
         );
         setLoading(false);
         return;
       }
 
-      if (data.usuario) {
-        setUsuarioId(data.usuario.id);
-        const codigo = gerarCodigo();
-        setCodigoGerado(codigo);
-        abrirModalCodigo(codigo);
-      }
+      // Se deu tudo certo, a API já disparou o e-mail. Vamos avisar o usuário.
+      abrirModal(
+        'info',
+        '📧 E-mail Enviado!',
+        'Enviamos um código de verificação para o seu e-mail. Lembre-se de verificar a caixa de spam.',
+        'ENTENDI, IR PARA O PASSO 2',
+        () => setStep(2)
+      );
 
     } catch (error: any) {
-      console.error('❌ Erro:', error);
+      console.error('Erro:', error);
       abrirModal(
         'erro',
-        '❌ Erro de Conexão',
+        'Erro de Conexão',
         'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.'
       );
     } finally {
@@ -173,48 +155,22 @@ export default function RecuperarSenhaScreen() {
 
   const handleRedefinirSenha = async () => {
     if (!codigo.trim()) {
-      abrirModal(
-        'erro',
-        '🔑 Código Obrigatório',
-        'Por favor, digite o código de verificação recebido no seu e-mail.'
-      );
+      abrirModal('erro', 'Código Obrigatório', 'Por favor, digite o código de verificação recebido no seu e-mail.');
       return;
     }
 
     if (!novaSenha.trim()) {
-      abrirModal(
-        'erro',
-        '🔒 Senha Obrigatória',
-        'Por favor, digite sua nova senha.'
-      );
+      abrirModal('erro', 'Senha Obrigatória', 'Por favor, digite sua nova senha.');
       return;
     }
 
     if (novaSenha.length < 4) {
-      abrirModal(
-        'erro',
-        '🔒 Senha Fraca',
-        'A senha deve ter pelo menos 4 caracteres.\n\nEscolha uma senha mais segura.'
-      );
+      abrirModal('erro', 'Senha Fraca', 'A senha deve ter pelo menos 4 caracteres.\n\nEscolha uma senha mais segura.');
       return;
     }
 
     if (novaSenha !== confirmarSenha) {
-      abrirModal(
-        'erro',
-        '❌ Senhas não coincidem',
-        'As senhas digitadas não são iguais.\n\nPor favor, digite a mesma senha nos dois campos.'
-      );
-      return;
-    }
-
-    if (codigo !== codigoGerado) {
-      abrirModal(
-        'erro',
-        '❌ Código Inválido',
-        'O código de verificação digitado está incorreto.\n\nVerifique o código enviado para seu e-mail e tente novamente.',
-        'Verificar Novamente'
-      );
+      abrirModal('erro', 'Senhas não coincidem', 'As senhas digitadas não são iguais.\n\nPor favor, digite a mesma senha nos dois campos.');
       return;
     }
 
@@ -234,7 +190,7 @@ export default function RecuperarSenhaScreen() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           nova_senha: novaSenha,
-          codigo: codigo
+          codigo: codigo // O backend que vai verificar se o código bate!
         }),
       });
 
@@ -242,10 +198,11 @@ export default function RecuperarSenhaScreen() {
       console.log('📡 Resposta:', data);
 
       if (!response.ok) {
+        // Se a API retornar erro (ex: código inválido ou expirado)
         abrirModal(
           'erro',
-          '❌ Erro ao Redefinir',
-          data.erro || 'Ocorreu um erro ao redefinir sua senha. Tente novamente.'
+          'Erro ao Redefinir',
+          data.erro || 'Ocorreu um erro ao redefinir sua senha. Verifique o código e tente novamente.'
         );
         setLoading(false);
         return;
@@ -253,27 +210,21 @@ export default function RecuperarSenhaScreen() {
 
       abrirModal(
         'sucesso',
-        '✅ Senha Redefinida!',
+        'Senha Redefinida!',
         'Sua senha foi redefinida com sucesso!\n\nAgora você pode fazer login com sua nova senha.',
         'Ir para Login',
         () => router.replace('/login')
       );
 
     } catch (error: any) {
-      console.error('❌ Erro:', error);
+      console.error('Erro:', error);
       abrirModal(
         'erro',
-        '❌ Erro de Conexão',
+        'Erro de Conexão',
         'Não foi possível conectar ao servidor.\n\nVerifique sua conexão e tente novamente.'
       );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const verCodigoNovamente = () => {
-    if (codigoGerado) {
-      abrirModalCodigo(codigoGerado);
     }
   };
 
@@ -284,8 +235,6 @@ export default function RecuperarSenhaScreen() {
   const voltarStep1 = () => {
     setStep(1);
     setCodigo('');
-    setCodigoGerado('');
-    setUsuarioId(null);
   };
 
   const renderModalIcon = () => {
@@ -336,18 +285,16 @@ export default function RecuperarSenhaScreen() {
             source={require('../assets/images/logomk.png')}
             style={styles.logo}
           />
-          <Text style={styles.logoText}>MKHealth</Text>
-          <Text style={styles.logoSubtext}>Recuperar Senha</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.title}>
-            {step === 1 ? '🔐 Recuperar Senha' : '🔑 Nova Senha'}
+            {step === 1 ? 'Recuperar Senha' : 'Nova Senha'}
           </Text>
           <Text style={styles.subtitle}>
             {step === 1 
               ? 'Digite seu e-mail cadastrado para receber o código de verificação' 
-              : 'Digite o código recebido e sua nova senha'
+              : 'Digite o código recebido no e-mail e sua nova senha'
             }
           </Text>
 
@@ -378,7 +325,7 @@ export default function RecuperarSenhaScreen() {
                 {loading ? (
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
-                  <Text style={styles.buttonText}>VERIFICAR E-MAIL</Text>
+                  <Text style={styles.buttonText}>ENVIAR CÓDIGO</Text>
                 )}
               </TouchableOpacity>
 
@@ -405,17 +352,10 @@ export default function RecuperarSenhaScreen() {
               <View style={styles.inputContainer}>
                 <View style={styles.codigoHeader}>
                   <Text style={styles.label}>Código de Verificação</Text>
-                  <TouchableOpacity 
-                    style={styles.verCodigoButton}
-                    onPress={verCodigoNovamente}
-                  >
-                    <Ionicons name="eye-outline" size={20} color="#8B0000" />
-                    <Text style={styles.verCodigoText}>Ver Código</Text>
-                  </TouchableOpacity>
                 </View>
                 <TextInput
                   style={styles.input}
-                  placeholder="Digite o código de 6 dígitos"
+                  placeholder="Digite o código recebido por e-mail"
                   placeholderTextColor="#999"
                   value={codigo}
                   onChangeText={setCodigo}
@@ -423,9 +363,6 @@ export default function RecuperarSenhaScreen() {
                   maxLength={6}
                   editable={!loading}
                 />
-                <Text style={styles.helperText}>
-                  Código gerado: {codigoGerado}
-                </Text>
               </View>
 
               <View style={styles.inputContainer}>
@@ -524,7 +461,6 @@ export default function RecuperarSenhaScreen() {
                 {modalTitulo}
               </Text>
 
-              {/* 🔥 SÓ MOSTRA A MENSAGEM SE NÃO FOR O MODAL DE CÓDIGO */}
               {modalMensagem !== '' && (
                 <Text style={[
                   styles.modalMensagem,
@@ -533,21 +469,6 @@ export default function RecuperarSenhaScreen() {
                 ]}>
                   {modalMensagem}
                 </Text>
-              )}
-
-              {/* 🔥 MODAL DE CÓDIGO - MOSTRA SÓ O EMAIL E O CÓDIGO */}
-              {modalTipo === 'info' && modalTitulo === '📧 Código Enviado!' && (
-                <>
-                  <View style={styles.modalEmailContainer}>
-                    <Ionicons name="mail" size={16} color="#666" />
-                    <Text style={styles.modalEmail}>{email}</Text>
-                  </View>
-
-                  <View style={styles.modalCodigoContainer}>
-                    <Text style={styles.modalCodigoLabel}>Seu código de verificação</Text>
-                    <Text style={styles.modalCodigo}>{codigoModal}</Text>
-                  </View>
-                </>
               )}
 
               <View style={styles.modalBotoesContainer}>
@@ -604,8 +525,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 160,
+    height: 160,
     resizeMode: 'contain',
     tintColor: '#FFF',
   },
@@ -673,18 +594,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#555',
     marginLeft: 5,
-  },
-  verCodigoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  verCodigoText: {
-    fontSize: 13,
-    color: '#8B0000',
-    fontWeight: '500',
-    marginLeft: 4,
   },
   input: {
     backgroundColor: '#F7F7F7',
@@ -771,8 +680,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-
-  // ESTILOS DO MODAL
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -858,51 +765,6 @@ const styles = StyleSheet.create({
   },
   modalMensagemError: {
     color: '#B71C1C',
-  },
-  modalEmailContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  modalEmail: {
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  modalCodigoContainer: {
-    backgroundColor: '#FFF8E1',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#FFB74D',
-    width: '100%',
-  },
-  modalCodigoLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  modalCodigo: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#E65100',
-    letterSpacing: 8,
-  },
-  modalInstrucao: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
   },
   modalBotoesContainer: {
     width: '100%',
