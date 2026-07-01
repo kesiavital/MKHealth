@@ -249,7 +249,6 @@ export default function ExamesScreen() {
       let examesFiltrados = examesData;
       if (!isAdmin) {
         const nomePaciente = userData.nome_completo?.toLowerCase().trim();
-<<<<<<< HEAD
         const cpfPaciente = userData.cpf?.replace(/\D/g, '');
 
         examesFiltrados = examesData.filter((exame: Exame) => {
@@ -260,19 +259,9 @@ export default function ExamesScreen() {
         console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
       } else {
         console.log(`📱 Admin - ${examesFiltrados.length} exames encontrados`);
-=======
-        examesFiltrados = data.filter((exame: Exame) => 
-          exame.paciente_nome?.toLowerCase().trim() === nomePaciente ||
-          exame.paciente_cpf === userData.cpf
-        );
-        console.log(`Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
-      } else {
-        console.log(`Médico - ${data.length} exames encontrados`);
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       }
 
       setListaExames(examesFiltrados);
-<<<<<<< HEAD
     } catch (error: any) {
       console.error('❌ Erro ao carregar exames:', error);
 
@@ -281,11 +270,6 @@ export default function ExamesScreen() {
       } else {
         abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
       }
-=======
-    } catch (error) {
-      console.error(' Erro ao carregar exames:', error);
-      abrirModal('erro', 'Erro', 'Não foi possível carregar a lista de exames');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setLoading(false);
     }
@@ -407,13 +391,12 @@ export default function ExamesScreen() {
         throw new Error(data.erro || 'Erro ao atualizar exame');
       }
 
-      abrirModal('sucesso', 'Sucesso!', 'Exame updated com sucesso!', 'OK', () => {
+      abrirModal('sucesso', 'Sucesso!', 'Exame atualizado com sucesso!', 'OK', () => {
         setModalVisible(false);
         carregarExames();
       });
 
     } catch (error: any) {
-<<<<<<< HEAD
       console.error('❌ Erro ao salvar:', error);
 
       if (error.message.includes('Sessão expirada')) {
@@ -421,9 +404,6 @@ export default function ExamesScreen() {
       } else {
         abrirModal('erro', '❌ Erro', error.message || 'Erro ao atualizar');
       }
-=======
-      abrirModal('erro', 'Erro', error.message || 'Erro ao atualizar');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setSaving(false);
     }
@@ -436,7 +416,6 @@ export default function ExamesScreen() {
     setModalBotaoTexto('Excluir');
     setModalAcao(() => async () => {
       try {
-<<<<<<< HEAD
         const response = await fetchWithToken(`${API_URL}/${id}`, {
           method: 'DELETE',
         });
@@ -455,12 +434,6 @@ export default function ExamesScreen() {
         } else {
           abrirModal('erro', '❌ Erro', error.message || 'Não foi possível deletar o exame');
         }
-=======
-        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-        abrirModal('sucesso', 'Sucesso', 'Exame deletado com sucesso!', 'OK', () => carregarExames());
-      } catch (error) {
-        abrirModal('erro', 'Erro', 'Não foi possível deletar o exame');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       }
     });
     setModalBotaoSecundario({ texto: 'Cancelar', acao: () => { } });
@@ -468,9 +441,6 @@ export default function ExamesScreen() {
     setModalVisibleGlobal(true);
   };
 
-  // ============================================
-  // 🔥 FUNÇÃO VISUALIZAR PDF - CORRIGIDA
-  // ============================================
   // ============================================
   // 🔥 FUNÇÃO VISUALIZAR PDF - CORRIGIDA PARA ANDROID
   // ============================================
@@ -483,7 +453,6 @@ export default function ExamesScreen() {
     setOpeningId(exame.id);
 
     try {
-<<<<<<< HEAD
       const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
 
       if (!token) {
@@ -495,18 +464,6 @@ export default function ExamesScreen() {
       console.log('📄 Abrindo PDF:', pdfUrl);
 
       // 🔥 PARA ANDROID - Usar Linking em vez de IntentLauncher
-=======
-      const pdfUrl = `http://${IP}:3000/api/exames/${exame.id}/visualizar`;
-      console.log('Abrindo PDF:', pdfUrl);
-      
-      const checkResponse = await fetch(pdfUrl, { method: 'HEAD' });
-      console.log('Status da verificação:', checkResponse.status);
-      
-      if (!checkResponse.ok) {
-        throw new Error(`PDF não encontrado (Status: ${checkResponse.status})`);
-      }
-      
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       if (Platform.OS === 'android') {
         // Verificar se o link pode ser aberto
         const supported = await Linking.canOpenURL(pdfUrl);
@@ -545,13 +502,6 @@ export default function ExamesScreen() {
       } else {
         abrirModal('erro', '❌ Erro', error.message || 'Não foi possível abrir o PDF');
       }
-<<<<<<< HEAD
-=======
-      
-    } catch (error) {
-      console.error('Erro ao abrir PDF:', error);
-      abrirModal('erro', 'Erro', `Não foi possível abrir o PDF.\n\nURL: ${API_URL}/${exame.id}/visualizar`);
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setOpeningId(null);
     }
@@ -567,15 +517,9 @@ export default function ExamesScreen() {
     setModalMensagem(`O que deseja fazer com o exame de ${exame.paciente_nome}?`);
     setModalBotaoTexto('Editar');
     setModalAcao(() => () => editarExame(exame));
-<<<<<<< HEAD
     setModalBotaoSecundario({
       texto: '🗑️ Excluir',
       acao: () => deletarExame(exame.id)
-=======
-    setModalBotaoSecundario({ 
-      texto: 'Excluir', 
-      acao: () => deletarExame(exame.id) 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     });
     setModalExamePdf(null);
     setModalVisibleGlobal(true);
@@ -689,13 +633,8 @@ export default function ExamesScreen() {
           </View>
         )}
 
-<<<<<<< HEAD
         {item.possui_pdf && (
           <TouchableOpacity
-=======
-        {item.possui_pdf ? (
-          <TouchableOpacity 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             style={styles.pdfButton}
             onPress={() => mostrarMenuPDF(item)}
             disabled={openingId === item.id}
@@ -709,7 +648,7 @@ export default function ExamesScreen() {
               </>
             )}
           </TouchableOpacity>
-        ) : null}
+        )}
       </View>
 
       <View style={styles.cardFooter}>
@@ -733,37 +672,12 @@ export default function ExamesScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <View style={styles.container}>
-<<<<<<< HEAD
-        <LinearGradient
-          colors={['#8B0000', '#A52A2A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <View style={styles.headerTop}>
-            <View style={styles.headerLeft}>
-              <MaterialCommunityIcons name="clipboard-list" size={28} color="#FFD700" />
-              <Text style={styles.headerTitle}>Meus Exames</Text>
-            </View>
-            <Image
-              source={require('../../assets/images/logomk.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.headerSubtitle}>
-            {listaExames.length} {listaExames.length === 1 ? 'exame' : 'exames'}
-            {!isAdmin && userData && ` • ${userData.nome_completo}`}
-=======
-        {/* HEADER COM COR SÓLIDA E LOGO GRANDE À DIREITA */}
-        {/* HEADER SIMPLIFICADO */}
         <View style={styles.header}>
           <Text style={styles.headerText}>
             {isAdmin 
               ? `Exames encontrados: ${listaExames.length}`
               : `${capitalizarNome(userData?.nome_completo?.split(' ')[0] || 'Paciente')}, você tem ${listaExames.length} ${listaExames.length === 1 ? 'exame' : 'exames'}`
             }
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
           </Text>
         </View>
 
@@ -987,11 +901,7 @@ export default function ExamesScreen() {
           />
         )}
 
-<<<<<<< HEAD
         {/* MODAL UNIVERSAL */}
-=======
-        {/* MODAL UNIVERSAL ESTILIZADO */}
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         <Modal
           animationType="fade"
           transparent={true}
@@ -1095,20 +1005,14 @@ const styles = StyleSheet.create({
     color: '#666'
   },
 
-<<<<<<< HEAD
-=======
-  // HEADER COM COR SÓLIDA E LOGO À DIREITA
-  // Substitua o seu objeto 'header' e 'headerLogo' dentro do StyleSheet pelos abaixo:
-
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   header: {
     backgroundColor: '#8B0000',
-    paddingTop: 40, // Espaço para não bater no status bar
-    paddingBottom: 30, 
+    paddingTop: 40,
+    paddingBottom: 30,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    marginBottom: -15, // Mantém o efeito de "engolir"
+    marginBottom: -15,
     zIndex: 1,
     elevation: 6,
     shadowColor: '#000',
@@ -1124,8 +1028,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   headerLogo: {
-    width: 60, // Reduzido de 85 para 60
-    height: 60, // Reduzido de 85 para 60
+    width: 60,
+    height: 60,
     tintColor: '#FFF',
   },
   headerSubtitle: {
@@ -1139,20 +1043,11 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 16,
   },
-<<<<<<< HEAD
 
   card: {
     backgroundColor: '#FFF',
     borderRadius: 14,
     marginBottom: 16,
-=======
-  
-  // CARDS
-  card: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 14, 
-    marginBottom: 16, 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1278,20 +1173,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999'
   },
-<<<<<<< HEAD
 
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60
-=======
-  
-  // EMPTY STATE
-  emptyContainer: { 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    paddingVertical: 60 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   },
   emptyTitle: {
     fontSize: 18,
@@ -1305,20 +1191,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center'
   },
-<<<<<<< HEAD
 
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end'
-=======
-  
-  // MODAL DE EDIÇÃO
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'flex-end' 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   },
   modalContainer: {
     backgroundColor: '#FFF',
@@ -1412,20 +1289,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold'
   },
-<<<<<<< HEAD
 
   selectModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end'
-=======
-  
-  // MODAIS DE SELEÇÃO
-  selectModalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'flex-end' 
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   },
   selectModalContainer: {
     backgroundColor: '#FFF',
@@ -1455,12 +1323,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333'
   },
-<<<<<<< HEAD
 
-=======
-  
-  // MODAL GLOBAL
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

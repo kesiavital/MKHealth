@@ -43,8 +43,8 @@ interface UserData {
   cpf: string;
   tipo_usuario: number;
   foto: string | null;
-  checkups_concluidos?: number; // NOVO
-  ganhou_coroa?: boolean; // NOVO
+  checkups_concluidos?: number;
+  ganhou_coroa?: boolean;
 }
 
 interface EngajamentoData {
@@ -90,7 +90,6 @@ export default function DashboardScreen() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-<<<<<<< HEAD
       // 🔥 PEGAR TOKEN
       const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
       console.log('🔑 Token encontrado?', !!token);
@@ -146,13 +145,6 @@ export default function DashboardScreen() {
       // 🔥 FILTRAR EXAMES BASEADO NO TIPO DE USUÁRIO
       let examesFinais = examesFiltrados;
 
-=======
-      const response = await fetch(API_URL);
-      const data: Exame[] = await response.json();
-      
-      let examesFiltrados = data;
-      
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       if (!isAdmin && userData) {
         const nomePaciente = userData.nome_completo?.toLowerCase().trim();
         const cpfPaciente = userData.cpf?.replace(/\D/g, '');
@@ -162,51 +154,31 @@ export default function DashboardScreen() {
           const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
           return nomeExame === nomePaciente || cpfExame === cpfPaciente;
         });
-<<<<<<< HEAD
         
         console.log(`📱 Paciente ${userData.nome_completo} - ${examesFinais.length} exames encontrados`);
       } else {
         console.log(`📱 Admin - ${examesFinais.length} exames encontrados`);
-=======
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       }
       
       setExames(examesFinais);
       
-<<<<<<< HEAD
       // 🔥 CALCULAR ESTATÍSTICAS COM OS EXAMES FILTRADOS
       if (examesFinais.length > 0) {
-        calcularEstatisticas(examesFinais);
-        calcularDadosGraficos(examesFinais);
+        calcularEngajamento(examesFinais);
         
         const ultimos = [...examesFinais].sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ).slice(0, 5);
         setUltimosExames(ultimos);
       } else {
-        // Resetar dados se não houver exames
-        setEstatisticas(null);
-        setExamesPorMes([]);
-        setExamesPorTipo([]);
         setUltimosExames([]);
+        setEngajamento(null);
       }
       
       console.log(`✅ ${examesFinais.length} exames carregados`);
     } catch (error: any) {
       console.error('❌ Erro:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados: ' + (error.message || ''));
-=======
-      const ultimos = [...examesFiltrados].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ).slice(0, 5);
-      setUltimosExames(ultimos);
-
-      calcularEngajamento(examesFiltrados);
-      
-    } catch (error) {
-      console.error(' Erro:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setLoading(false);
     }
@@ -319,7 +291,6 @@ export default function DashboardScreen() {
       atencaoColor,
       atencaoBg,
       atencaoIcon,
-      // Passando as novas propriedades computadas para o estado
       qtdEstrelas,
       ganhouCoroa
     });
@@ -355,8 +326,8 @@ export default function DashboardScreen() {
         <MaterialCommunityIcons 
           key={i} 
           name="star" 
-          size={32} // Estrelas grandes e bonitas
-          color={i <= total ? "#FFD700" : "#E0E0E0"} // Amarelo se completou, Cinza se não
+          size={32}
+          color={i <= total ? "#FFD700" : "#E0E0E0"}
           style={{ marginHorizontal: 4 }}
         />
       );
@@ -456,16 +427,13 @@ export default function DashboardScreen() {
         {hasData && engajamento && !isAdmin && (
           <>
             <View style={styles.gamificationContainer}>
-              {/* ========================================== */}
-              {/* NOVO CARD EXCLUSIVO DE ESTRELAS E COMBOS */}
-              {/* ========================================== */}
+              {/* CARD DE ESTRELAS E COMBOS */}
               <View style={[styles.gamificationCard, { borderLeftColor: '#9C27B0', marginBottom: 10 }]}>
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={[styles.gamificationText, { textAlign: 'center', marginBottom: 10 }]}>
                     Desbloqueie conquistas! Você fez <Text style={styles.boldText}>{engajamento.qtdEstrelas} de 5</Text> combos.
                   </Text>
                   
-                  {/* Container que chama as 5 estrelas lado a lado */}
                   <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
                     {renderEstrelas()}
                   </View>
@@ -477,7 +445,7 @@ export default function DashboardScreen() {
                   </Text>
                 </View>
               </View>
-              {/* ========================================== */}
+              
               <View style={styles.gamificationCard}>
                 <MaterialCommunityIcons name="trophy-award" size={32} color="#FFD700" />
                 <View style={styles.gamificationTextWrapper}>
@@ -510,7 +478,6 @@ export default function DashboardScreen() {
                 </View>
               </View>
 
-              {/* CARD DE EXAMES EXPIRANDO */}
               <View style={styles.statusItem}>
                 <View style={[styles.statusIconBg, { backgroundColor: '#FFF3E0' }]}>
                   <MaterialCommunityIcons name="clock-alert" size={24} color="#FF9800" />
@@ -609,13 +576,12 @@ const styles = StyleSheet.create({
   userInfo: { flexDirection: 'row', alignItems: 'center' },
   userName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   userCpf: { color: '#DDD', fontSize: 12 },
-  // AJUSTADO: Aumentado o tamanho de 70 para 85 para dar mais destaque visual
   logoRight: { width: 85, height: 85, resizeMode: 'contain', marginLeft: 'auto', tintColor: '#FFF' },
    
-   coroaWrapper: {
+  coroaWrapper: {
     position: 'absolute',
     top: -10,
-    right: -5, //voce editou aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+    right: -5,
     transform: [{ rotate: '15deg' }],
   },
 

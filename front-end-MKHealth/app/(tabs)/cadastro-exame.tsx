@@ -322,7 +322,6 @@ export default function CadastroExameScreen() {
       );
       
     } catch (error: any) {
-<<<<<<< HEAD
       console.error('❌ Erro:', error);
       
       if (error.message.includes('Sessão expirada')) {
@@ -330,10 +329,6 @@ export default function CadastroExameScreen() {
       } else {
         abrirModal('erro', '❌ Erro', error.message || 'Não foi possível cadastrar o exame');
       }
-=======
-      console.error('Erro:', error);
-      abrirModal('erro', 'Erro', error.message || 'Não foi possível cadastrar o exame');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setSaving(false);
       setUploadingFile(false);
@@ -394,26 +389,8 @@ export default function CadastroExameScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-<<<<<<< HEAD
           {/* HEADER */}
-          <LinearGradient
-            colors={['#8B0000', '#A52A2A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <View style={styles.headerTop}>
-              <Image
-                source={require('../../assets/images/logomk.png')}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
-            </View>
-            
-=======
-          {/* HEADER COM COR SÓLIDA E LOGO REMOVIDA */}
           <View style={styles.header}>
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.headerIconContainer}>
               <MaterialCommunityIcons name="file-plus" size={40} color="#FFD700" />
             </View>
@@ -421,11 +398,7 @@ export default function CadastroExameScreen() {
             <Text style={styles.headerSubtitle}>Preencha todos os campos obrigatórios (*)</Text>
           </View>
 
-<<<<<<< HEAD
           {/* FORMULÁRIO */}
-=======
-          {/*FORMULÁRIO */}
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
           <View style={styles.formCard}>
             
             {/* CPF do Paciente */}
@@ -611,7 +584,6 @@ export default function CadastroExameScreen() {
           </View>
         </ScrollView>
 
-<<<<<<< HEAD
         {/* MODAL DE SELEÇÃO - TIPO EXAME */}
         <Modal visible={showTipoSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
@@ -646,122 +618,17 @@ export default function CadastroExameScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-=======
-        {/* MODAL GLOBAL */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={fecharModal}
-        >
-          <View style={styles.modalOverlayGlobal}>
-            <View style={styles.modalContentGlobal}>
-              <View style={styles.modalIconContainer}>
-                {renderModalIcon()}
-              </View>
-              
-              <Text style={[
-                styles.modalTitle,
-                modalTipo === 'sucesso' && styles.modalTitleSuccess,
-                modalTipo === 'erro' && styles.modalTitleError,
-                modalTipo === 'info' && styles.modalTitleInfo,
-                modalTipo === 'confirmacao' && styles.modalTitleConfirm,
-              ]}>
-                {modalTitulo}
-              </Text>
-              
-              <Text style={[
-                styles.modalMensagem,
-                modalTipo === 'sucesso' && styles.modalMensagemSuccess,
-                modalTipo === 'erro' && styles.modalMensagemError,
-              ]}>
-                {modalMensagem}
-              </Text>
-
-              <View style={styles.modalBotoesContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    styles.modalButtonPrincipal,
-                    modalTipo === 'sucesso' && styles.modalButtonSuccess,
-                    modalTipo === 'erro' && styles.modalButtonError,
-                    modalTipo === 'info' && styles.modalButtonInfo,
-                    modalTipo === 'confirmacao' && styles.modalButtonConfirm,
-                  ]}
-                  onPress={fecharModal}
-                >
-                  <Text style={styles.modalButtonText}>{modalBotaoTexto}</Text>
-                </TouchableOpacity>
-
-                {modalBotaoSecundario && (
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonSecundario]}
-                    onPress={() => {
-                      setModalVisible(false);
-                      modalBotaoSecundario.acao();
-                    }}
-                  >
-                    <Text style={[styles.modalButtonText, styles.modalButtonTextSecundario]}>
-                      {modalBotaoSecundario.texto}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             </View>
           </View>
         </Modal>
 
-<<<<<<< HEAD
         {/* MODAL DE SELEÇÃO - MÉDICO */}
         <Modal visible={showMedicoSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
-=======
-        {/* MODAL: TIPO DE EXAME */}
-        <Modal visible={showTipoSelect} transparent animationType="slide">
-          <TouchableOpacity 
-            style={styles.selectModalOverlay} 
-            activeOpacity={1} 
-            onPress={() => setShowTipoSelect(false)}
-          >
-            <View style={styles.selectModalContainer}>
-              <View style={styles.selectModalHeader}>
-                <Text style={styles.selectModalTitle}>Selecione o Tipo de Exame</Text>
-                <TouchableOpacity onPress={() => setShowTipoSelect(false)}>
-                  <MaterialCommunityIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {TIPOS_EXAME.map((tipo, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.selectOption}
-                    onPress={() => {
-                      setFormData({ ...formData, tipo_exame: tipo });
-                      setShowTipoSelect(false);
-                    }}
-                  >
-                    <Text style={styles.selectOptionText}>{tipo}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* MODAL: MÉDICO SOLICITANTE */}
-        <Modal visible={showMedicoSelect} transparent animationType="slide">
-          <TouchableOpacity 
-            style={styles.selectModalOverlay} 
-            activeOpacity={1} 
-            onPress={() => setShowMedicoSelect(false)}
-          >
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.selectModalContainer}>
               <View style={styles.selectModalHeader}>
                 <Text style={styles.selectModalTitle}>Selecione o Médico</Text>
                 <TouchableOpacity onPress={() => setShowMedicoSelect(false)}>
-<<<<<<< HEAD
                   <MaterialCommunityIcons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
@@ -786,50 +653,20 @@ export default function CadastroExameScreen() {
                     {formData.medico_solicitante === item && (
                       <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
                     )}
-=======
-                  <MaterialCommunityIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {MEDICOS.map((medico, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.selectOption}
-                    onPress={() => {
-                      setFormData({ ...formData, medico_solicitante: medico });
-                      setShowMedicoSelect(false);
-                    }}
-                  >
-                    <Text style={styles.selectOptionText}>{medico}</Text>
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-<<<<<<< HEAD
           </View>
         </Modal>
 
         {/* MODAL DE SELEÇÃO - LABORATÓRIO */}
         <Modal visible={showLaboratorioSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
-=======
-          </TouchableOpacity>
-        </Modal>
-
-        {/* MODAL: LABORATÓRIO */}
-        <Modal visible={showLaboratorioSelect} transparent animationType="slide">
-          <TouchableOpacity 
-            style={styles.selectModalOverlay} 
-            activeOpacity={1} 
-            onPress={() => setShowLaboratorioSelect(false)}
-          >
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.selectModalContainer}>
               <View style={styles.selectModalHeader}>
                 <Text style={styles.selectModalTitle}>Selecione o Laboratório</Text>
                 <TouchableOpacity onPress={() => setShowLaboratorioSelect(false)}>
-<<<<<<< HEAD
                   <MaterialCommunityIcons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
@@ -854,27 +691,10 @@ export default function CadastroExameScreen() {
                     {formData.laboratorio === item && (
                       <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
                     )}
-=======
-                  <MaterialCommunityIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {LABORATORIOS.map((lab, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.selectOption}
-                    onPress={() => {
-                      setFormData({ ...formData, laboratorio: lab });
-                      setShowLaboratorioSelect(false);
-                    }}
-                  >
-                    <Text style={styles.selectOptionText}>{lab}</Text>
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-<<<<<<< HEAD
           </View>
         </Modal>
 
@@ -974,20 +794,10 @@ export default function CadastroExameScreen() {
           </Pressable>
         </Modal>
 
-=======
-          </TouchableOpacity>
-        </Modal>
-
-        {/* CALENDÁRIO */}
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         {showDatePicker && (
           <DateTimePicker
             value={formData.data_exame}
             mode="date"
-<<<<<<< HEAD
-=======
-            display="default"
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             onChange={(event, selectedDate) => {
               setShowDatePicker(false);
               if (selectedDate) {
@@ -996,7 +806,6 @@ export default function CadastroExameScreen() {
             }}
           />
         )}
-<<<<<<< HEAD
 
         {/* MODAL UNIVERSAL */}
         <Modal
@@ -1063,8 +872,6 @@ export default function CadastroExameScreen() {
             </View>
           </Pressable>
         </Modal>
-=======
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1083,10 +890,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   
-<<<<<<< HEAD
-=======
-  // HEADER COM COR SÓLIDA (SEM LOGO)
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   header: {
     backgroundColor: '#8B0000', 
     paddingTop: 15,
@@ -1101,19 +904,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-<<<<<<< HEAD
-  headerTop: {
-    width: '100%',
-    alignItems: 'flex-end',
-    marginBottom: 10,
-  },
-  headerLogo: {
-    width: 70,
-    height: 70,
-    tintColor: '#FFF',
-  },
-=======
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   headerIconContainer: {
     width: 60, 
     height: 60,
@@ -1135,10 +925,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-<<<<<<< HEAD
-=======
-  // FORMULÁRIO
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   formCard: {
     backgroundColor: '#FFF',
     margin: 16,
@@ -1206,10 +992,6 @@ const styles = StyleSheet.create({
     color: '#999',
   },
 
-<<<<<<< HEAD
-=======
-  // PDF SECTION
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   pdfSection: {
     marginTop: 10,
     marginBottom: 20,
@@ -1293,10 +1075,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-<<<<<<< HEAD
-=======
-  // UPLOADING
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   uploadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1313,10 +1091,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-<<<<<<< HEAD
-=======
-  // SAVE BUTTON
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1344,10 +1118,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-<<<<<<< HEAD
-=======
-  // LOADING
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1360,10 +1130,6 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 
-<<<<<<< HEAD
-=======
-  // MODAL DE SELEÇÃO
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   selectModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1401,7 +1167,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-<<<<<<< HEAD
   customOptionText: {
     color: '#8B0000',
     fontWeight: 'bold',
@@ -1448,14 +1213,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
-=======
-
-  // MODAL GLOBAL
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainerGlobal: {
+    padding: 20,
+    width: '100%',
     alignItems: 'center',
   },
   modalContentGlobal: {

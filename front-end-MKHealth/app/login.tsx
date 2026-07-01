@@ -75,43 +75,19 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Validação CPF
     if (!cpf.trim()) {
-<<<<<<< HEAD
       abrirModal('erro', '⚠️ Campo Vazio', 'Por favor, digite seu CPF para continuar.');
-=======
-      abrirModal(
-        'erro',
-        'Campo Vazio',
-        'Por favor, digite seu CPF para continuar.'
-      );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
     const cpfLimpo = limparCPF(cpf);
     if (cpfLimpo.length !== 11) {
-<<<<<<< HEAD
       abrirModal('erro', '📄 CPF Inválido', 'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00');
-=======
-      abrirModal(
-        'erro',
-        'CPF Inválido',
-        'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00'
-      );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
     // Validação Senha
     if (!password.trim()) {
-<<<<<<< HEAD
       abrirModal('erro', '🔒 Campo Vazio', 'Por favor, digite sua senha para continuar.');
-=======
-      abrirModal(
-        'erro',
-        ' Campo Vazio',
-        'Por favor, digite sua senha para continuar.'
-      );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
@@ -119,13 +95,9 @@ export default function LoginScreen() {
 
     try {
       const loginUrl = `${USUARIOS_URL}/login`;
-<<<<<<< HEAD
       console.log('📡 ====== INICIANDO LOGIN ======');
       console.log('📡 URL:', loginUrl);
       console.log('📡 CPF:', cpfLimpo);
-=======
-      console.log(' ====== INICIANDO LOGIN ======');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
       // ===== 1. FAZ REQUISIÇÃO PARA O BACKEND =====
       const response = await fetch(loginUrl, {
@@ -141,12 +113,8 @@ export default function LoginScreen() {
       });
 
       const data = await response.json();
-<<<<<<< HEAD
       console.log('📡 Resposta status:', response.status);
       console.log('📡 Resposta data:', JSON.stringify(data, null, 2));
-=======
-      console.log('Resposta:', JSON.stringify(data, null, 2));
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
       // ===== 2. TRATAMENTO DE ERROS =====
       if (response.status === 404) {
@@ -182,31 +150,15 @@ export default function LoginScreen() {
       }
 
       if (!response.ok) {
-<<<<<<< HEAD
         abrirModal('erro', '❌ Erro no Login', data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.');
-=======
-        abrirModal(
-          'erro',
-          'Erro no Login',
-          data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.'
-        );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
 
       // ===== 3. VERIFICA SE VEIO O TOKEN =====
       if (!data.token || !data.usuario) {
-<<<<<<< HEAD
         console.error('❌ Dados incompletos:', data);
         abrirModal('erro', '❌ Resposta Inválida', 'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.');
-=======
-        abrirModal(
-          'erro',
-          ' Resposta Inválida',
-          'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.'
-        );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -223,15 +175,7 @@ export default function LoginScreen() {
       const salvou = await saveUserData(data.token, data.usuario);
       
       if (!salvou) {
-<<<<<<< HEAD
         abrirModal('erro', '❌ Erro ao Salvar', 'Não foi possível salvar seus dados localmente.');
-=======
-        abrirModal(
-          'erro',
-          'Erro ao Salvar',
-          'Não foi possível salvar seus dados localmente.\n\nVerifique o armazenamento do dispositivo.'
-        );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -240,7 +184,6 @@ export default function LoginScreen() {
       const tokenSalvo = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
       const userSalvo = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       
-<<<<<<< HEAD
       console.log('🔍 Verificação final:');
       console.log('📌 Token salvo?', !!tokenSalvo);
       console.log('📌 Token:', tokenSalvo?.substring(0, 30) + '...');
@@ -250,19 +193,6 @@ export default function LoginScreen() {
       if (!tokenSalvo || !userSalvo) {
         console.error('❌ Falha na verificação dos dados salvos!');
         abrirModal('erro', '❌ Erro ao Salvar', 'Erro ao salvar seus dados. Tente novamente.');
-=======
-      console.log(' Verificação final antes de redirecionar:');
-      console.log(' Token existe?', !!tokenFinal);
-      console.log(' UserData existe?', !!userFinal);
-
-      if (!tokenFinal || !userFinal) {
-        console.error('Dados sumiram!');
-        abrirModal(
-          'erro',
-          'Erro ao Salvar',
-          'Erro ao salvar seus dados. Tente novamente.'
-        );
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -280,11 +210,7 @@ export default function LoginScreen() {
         `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\n👤 Tipo: ${tipoDescricao}`,
         'ENTRAR',
         () => {
-<<<<<<< HEAD
           console.log('🚀 NAVEGANDO PARA HOME...');
-=======
-          console.log('REDIRECIONANDO PARA HOME...');
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
           router.replace('/(tabs)');
         }
       );
@@ -293,13 +219,8 @@ export default function LoginScreen() {
       console.error('ERRO no login:', error);
       abrirModal(
         'erro',
-<<<<<<< HEAD
         '❌ Erro de Conexão',
         `Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet.\n\nDetalhe: ${error.message || 'Erro desconhecido'}`,
-=======
-        'Erro de Conexão',
-        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.',
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         'Tentar Novamente'
       );
     } finally {
@@ -425,7 +346,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
-<<<<<<< HEAD
 
           {/* 🔥 CADASTRE-SE - IGUAL AO ESQUECI SENHA */}
           <TouchableOpacity
@@ -435,17 +355,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.registerTextLink}>Não tem uma conta? Cadastre-se</Text>
           </TouchableOpacity>
-=======
-          
-          {/* BOTAO CADASTRO */}
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Não tem uma conta? </Text>
-            <TouchableOpacity onPress={navigateToPublicRegister} disabled={loading}>
-              <Text style={styles.registerLink}>Cadastre-se</Text>
-            </TouchableOpacity>
-          </View>
-          
->>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         </View>
       </View>
 
@@ -541,8 +450,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,      // Empurra a logo um pouco mais para baixo
-    marginBottom: 15,   // Reduzir esse valor puxa o card para cima, mais perto da logo
+    marginTop: 40,
+    marginBottom: 15,
   },
   logo: {
     width: 160,
@@ -656,7 +565,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  // 🔥 CADASTRO - IGUAL AO ESQUECI SENHA
   registerButton: {
     alignItems: 'center',
     marginTop: 12,
