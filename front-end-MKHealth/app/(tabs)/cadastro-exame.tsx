@@ -3,12 +3,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,36 +25,21 @@ import { STORAGE_KEYS } from '../../service/auth';
 const API_URL = `http://${IP}:3000/api/exames`;
 
 const TIPOS_EXAME = [
-  'Hemograma', 'Glicemia', 'Colesterol', 'Triglicerídeos', 'Urina',
-  'Raio-X', 'Ultrassom', 'Tomografia', 'Ressonância', 'Eletrocardiograma',
-  'Teste de Esforço', 'Endoscopia', 'Colonoscopia', 'Mamografia',
-  'Papanicolau', 'PCR', 'COVID-19', 'Outro',
+  'Check-Up Preventivo', 'Check-Up Gym', 'Check-Up Veggie', 'Check-Up Sono', 'Check-Up Cardio',
+   'Outro',
 ];
 
 const MEDICOS = [
-  'Dr. João Silva - Clínico Geral',
-  'Dra. Maria Santos - Cardiologista',
-  'Dr. Pedro Oliveira - Ortopedista',
-  'Dra. Ana Costa - Ginecologista',
-  'Dr. Carlos Mendes - Neurologista',
-  'Dra. Patricia Lima - Dermatologista',
-  'Dr. Ricardo Alves - Pediatra',
-  'Dra. Fernanda Rocha - Endocrinologista',
-  'Dr. Eduardo Souza - Urologista',
-  'Dra. Lucia Ferreira - Oftalmologista',
+  'Dr. Cesar Florencio - Patologista Clinico',
+  'Dra. Helena Vital - Farmaceutica-Bioquimica',
+  'Dr. Hallef Magno - Biomédico',
+  'Dr. Samuel Vital - Patologista Clinico',
+  'Dr. Ezequias Careirro - Biomédico',
   'Outro',
 ];
 
 const LABORATORIOS = [
-  'Lab Diagnóstico Avançado',
-  'Lab Medicina Laboratorial',
-  'Lab Análises Clínicas',
-  'Lab Alta Precisão',
-  'Lab Central de Análises',
-  'Lab Biotec Diagnósticos',
-  'Lab Patologia Molecular',
-  'Lab Saúde Total',
-  'Lab Exame Rápido',
+  'Lab Vitalle - Patologia Clinica',
   'Outro',
 ];
 
@@ -73,7 +56,7 @@ export default function CadastroExameScreen() {
   const [saving, setSaving] = useState(false);
   
   const [formData, setFormData] = useState({
-    paciente_nome: '',
+    paciente_cpf: '', 
     tipo_exame: '',
     data_exame: new Date(),
     medico_solicitante: '',
@@ -116,7 +99,7 @@ export default function CadastroExameScreen() {
         if (userData?.tipo_usuario !== 1) {
           abrirModal(
             'erro',
-            '🚫 Acesso Negado',
+            'Acesso Negado',
             'Apenas médicos podem cadastrar exames.',
             'OK',
             () => router.replace('/(tabs)')
@@ -128,7 +111,7 @@ export default function CadastroExameScreen() {
       } else {
         abrirModal(
           'erro',
-          '❌ Não Logado',
+          'Não Logado',
           'Você precisa estar logado para acessar esta tela.',
           'Ir para Login',
           () => router.replace('/login')
@@ -136,7 +119,7 @@ export default function CadastroExameScreen() {
         setIsAdmin(false);
       }
     } catch (error) {
-      console.error('❌ Erro ao verificar acesso:', error);
+      console.error('Erro ao verificar acesso:', error);
       setIsAdmin(false);
     } finally {
       setIsLoading(false);
@@ -202,6 +185,15 @@ export default function CadastroExameScreen() {
     }
   };
 
+  const aplicarMascaraCPF = (texto: string) => {
+    const apenasNumeros = texto.replace(/\D/g, ''); 
+    return apenasNumeros
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1'); 
+  };
+
   const formatarDataExibicao = (data: Date) => {
     const dia = String(data.getDate()).padStart(2, '0');
     const mes = String(data.getMonth() + 1).padStart(2, '0');
@@ -240,8 +232,8 @@ export default function CadastroExameScreen() {
         abrirModal('sucesso', '✅ PDF Selecionado', `Arquivo "${file.name}" selecionado com sucesso!`);
       }
     } catch (error) {
-      console.error('❌ Erro ao selecionar PDF:', error);
-      abrirModal('erro', '❌ Erro', 'Não foi possível selecionar o PDF');
+      console.error('Erro ao selecionar PDF:', error);
+      abrirModal('erro', 'Erro', 'Não foi possível selecionar o PDF');
     }
   };
 
@@ -250,20 +242,20 @@ export default function CadastroExameScreen() {
   };
 
   const salvarExame = async () => {
-    if (!formData.paciente_nome.trim()) {
-      abrirModal('erro', '⚠️ Campo Obrigatório', 'Nome do paciente é obrigatório');
+    if (!formData.paciente_cpf.trim() || formData.paciente_cpf.length < 14) {
+      abrirModal('erro', 'Campo Obrigatório', 'Digite um CPF válido (11 dígitos)');
       return;
     }
     if (!formData.tipo_exame.trim()) {
-      abrirModal('erro', '⚠️ Campo Obrigatório', 'Tipo de exame é obrigatório');
+      abrirModal('erro', 'Campo Obrigatório', 'Tipo de exame é obrigatório');
       return;
     }
     if (!formData.medico_solicitante.trim()) {
-      abrirModal('erro', '⚠️ Campo Obrigatório', 'Médico solicitante é obrigatório');
+      abrirModal('erro', 'Campo Obrigatório', 'Médico solicitante é obrigatório');
       return;
     }
     if (!formData.laboratorio.trim()) {
-      abrirModal('erro', '⚠️ Campo Obrigatório', 'Laboratório é obrigatório');
+      abrirModal('erro', 'Campo Obrigatório', 'Laboratório é obrigatório');
       return;
     }
 
@@ -272,7 +264,7 @@ export default function CadastroExameScreen() {
 
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append('paciente_nome', formData.paciente_nome.trim());
+      formDataToSend.append('paciente_cpf', formData.paciente_cpf);
       formDataToSend.append('tipo_exame', formData.tipo_exame.trim());
       formDataToSend.append('data_exame', formatarDataAPI(formData.data_exame));
       formDataToSend.append('medico_solicitante', formData.medico_solicitante.trim());
@@ -308,12 +300,12 @@ export default function CadastroExameScreen() {
 
       abrirModal(
         'sucesso',
-        '✅ Sucesso!',
+        'Sucesso!',
         attachment ? 'Exame cadastrado com PDF anexado!' : 'Exame cadastrado com sucesso!',
         'OK',
         () => {
           setFormData({
-            paciente_nome: '',
+            paciente_cpf: '',
             tipo_exame: '',
             data_exame: new Date(),
             medico_solicitante: '',
@@ -330,6 +322,7 @@ export default function CadastroExameScreen() {
       );
       
     } catch (error: any) {
+<<<<<<< HEAD
       console.error('❌ Erro:', error);
       
       if (error.message.includes('Sessão expirada')) {
@@ -337,6 +330,10 @@ export default function CadastroExameScreen() {
       } else {
         abrirModal('erro', '❌ Erro', error.message || 'Não foi possível cadastrar o exame');
       }
+=======
+      console.error('Erro:', error);
+      abrirModal('erro', 'Erro', error.message || 'Não foi possível cadastrar o exame');
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
     } finally {
       setSaving(false);
       setUploadingFile(false);
@@ -388,7 +385,7 @@ export default function CadastroExameScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
@@ -397,6 +394,7 @@ export default function CadastroExameScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+<<<<<<< HEAD
           {/* HEADER */}
           <LinearGradient
             colors={['#8B0000', '#A52A2A']}
@@ -412,27 +410,38 @@ export default function CadastroExameScreen() {
               />
             </View>
             
+=======
+          {/* HEADER COM COR SÓLIDA E LOGO REMOVIDA */}
+          <View style={styles.header}>
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.headerIconContainer}>
               <MaterialCommunityIcons name="file-plus" size={40} color="#FFD700" />
             </View>
             <Text style={styles.headerTitle}>Cadastrar Exame</Text>
             <Text style={styles.headerSubtitle}>Preencha todos os campos obrigatórios (*)</Text>
-          </LinearGradient>
+          </View>
 
+<<<<<<< HEAD
           {/* FORMULÁRIO */}
+=======
+          {/*FORMULÁRIO */}
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
           <View style={styles.formCard}>
-            {/* Nome do Paciente */}
+            
+            {/* CPF do Paciente */}
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
-                <MaterialCommunityIcons name="account" size={18} color="#8B0000" />
-                <Text style={styles.label}>Nome do Paciente <Text style={styles.required}>*</Text></Text>
+                <MaterialCommunityIcons name="card-account-details" size={18} color="#8B0000" />
+                <Text style={styles.label}>CPF do Paciente <Text style={styles.required}>*</Text></Text>
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Digite o nome completo do paciente"
+                placeholder="000.000.000-00"
                 placeholderTextColor="#999"
-                value={formData.paciente_nome}
-                onChangeText={(text) => setFormData({ ...formData, paciente_nome: text })}
+                keyboardType="numeric"
+                maxLength={14}
+                value={formData.paciente_cpf}
+                onChangeText={(text) => setFormData({ ...formData, paciente_cpf: aplicarMascaraCPF(text) })}
               />
             </View>
 
@@ -457,7 +466,7 @@ export default function CadastroExameScreen() {
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <MaterialCommunityIcons name="calendar" size={18} color="#8B0000" />
-                <Text style={styles.label}>Data do Exame <Text style={styles.required}>*</Text></Text>
+                <Text style={styles.label}>Data do Exame <Text style={styles.required}> * </Text></Text>
               </View>
               <TouchableOpacity 
                 style={styles.selectButton}
@@ -602,6 +611,7 @@ export default function CadastroExameScreen() {
           </View>
         </ScrollView>
 
+<<<<<<< HEAD
         {/* MODAL DE SELEÇÃO - TIPO EXAME */}
         <Modal visible={showTipoSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
@@ -636,17 +646,122 @@ export default function CadastroExameScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+=======
+        {/* MODAL GLOBAL */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={fecharModal}
+        >
+          <View style={styles.modalOverlayGlobal}>
+            <View style={styles.modalContentGlobal}>
+              <View style={styles.modalIconContainer}>
+                {renderModalIcon()}
+              </View>
+              
+              <Text style={[
+                styles.modalTitle,
+                modalTipo === 'sucesso' && styles.modalTitleSuccess,
+                modalTipo === 'erro' && styles.modalTitleError,
+                modalTipo === 'info' && styles.modalTitleInfo,
+                modalTipo === 'confirmacao' && styles.modalTitleConfirm,
+              ]}>
+                {modalTitulo}
+              </Text>
+              
+              <Text style={[
+                styles.modalMensagem,
+                modalTipo === 'sucesso' && styles.modalMensagemSuccess,
+                modalTipo === 'erro' && styles.modalMensagemError,
+              ]}>
+                {modalMensagem}
+              </Text>
+
+              <View style={styles.modalBotoesContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.modalButtonPrincipal,
+                    modalTipo === 'sucesso' && styles.modalButtonSuccess,
+                    modalTipo === 'erro' && styles.modalButtonError,
+                    modalTipo === 'info' && styles.modalButtonInfo,
+                    modalTipo === 'confirmacao' && styles.modalButtonConfirm,
+                  ]}
+                  onPress={fecharModal}
+                >
+                  <Text style={styles.modalButtonText}>{modalBotaoTexto}</Text>
+                </TouchableOpacity>
+
+                {modalBotaoSecundario && (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSecundario]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      modalBotaoSecundario.acao();
+                    }}
+                  >
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextSecundario]}>
+                      {modalBotaoSecundario.texto}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             </View>
           </View>
         </Modal>
 
+<<<<<<< HEAD
         {/* MODAL DE SELEÇÃO - MÉDICO */}
         <Modal visible={showMedicoSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
+=======
+        {/* MODAL: TIPO DE EXAME */}
+        <Modal visible={showTipoSelect} transparent animationType="slide">
+          <TouchableOpacity 
+            style={styles.selectModalOverlay} 
+            activeOpacity={1} 
+            onPress={() => setShowTipoSelect(false)}
+          >
+            <View style={styles.selectModalContainer}>
+              <View style={styles.selectModalHeader}>
+                <Text style={styles.selectModalTitle}>Selecione o Tipo de Exame</Text>
+                <TouchableOpacity onPress={() => setShowTipoSelect(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {TIPOS_EXAME.map((tipo, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      setFormData({ ...formData, tipo_exame: tipo });
+                      setShowTipoSelect(false);
+                    }}
+                  >
+                    <Text style={styles.selectOptionText}>{tipo}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* MODAL: MÉDICO SOLICITANTE */}
+        <Modal visible={showMedicoSelect} transparent animationType="slide">
+          <TouchableOpacity 
+            style={styles.selectModalOverlay} 
+            activeOpacity={1} 
+            onPress={() => setShowMedicoSelect(false)}
+          >
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.selectModalContainer}>
               <View style={styles.selectModalHeader}>
                 <Text style={styles.selectModalTitle}>Selecione o Médico</Text>
                 <TouchableOpacity onPress={() => setShowMedicoSelect(false)}>
+<<<<<<< HEAD
                   <MaterialCommunityIcons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
@@ -671,20 +786,50 @@ export default function CadastroExameScreen() {
                     {formData.medico_solicitante === item && (
                       <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
                     )}
+=======
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {MEDICOS.map((medico, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      setFormData({ ...formData, medico_solicitante: medico });
+                      setShowMedicoSelect(false);
+                    }}
+                  >
+                    <Text style={styles.selectOptionText}>{medico}</Text>
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
+<<<<<<< HEAD
           </View>
         </Modal>
 
         {/* MODAL DE SELEÇÃO - LABORATÓRIO */}
         <Modal visible={showLaboratorioSelect} transparent animationType="slide">
           <View style={styles.selectModalOverlay}>
+=======
+          </TouchableOpacity>
+        </Modal>
+
+        {/* MODAL: LABORATÓRIO */}
+        <Modal visible={showLaboratorioSelect} transparent animationType="slide">
+          <TouchableOpacity 
+            style={styles.selectModalOverlay} 
+            activeOpacity={1} 
+            onPress={() => setShowLaboratorioSelect(false)}
+          >
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             <View style={styles.selectModalContainer}>
               <View style={styles.selectModalHeader}>
                 <Text style={styles.selectModalTitle}>Selecione o Laboratório</Text>
                 <TouchableOpacity onPress={() => setShowLaboratorioSelect(false)}>
+<<<<<<< HEAD
                   <MaterialCommunityIcons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
@@ -709,10 +854,27 @@ export default function CadastroExameScreen() {
                     {formData.laboratorio === item && (
                       <MaterialCommunityIcons name="check" size={20} color="#4CAF50" />
                     )}
+=======
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {LABORATORIOS.map((lab, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      setFormData({ ...formData, laboratorio: lab });
+                      setShowLaboratorioSelect(false);
+                    }}
+                  >
+                    <Text style={styles.selectOptionText}>{lab}</Text>
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
+<<<<<<< HEAD
           </View>
         </Modal>
 
@@ -812,10 +974,20 @@ export default function CadastroExameScreen() {
           </Pressable>
         </Modal>
 
+=======
+          </TouchableOpacity>
+        </Modal>
+
+        {/* CALENDÁRIO */}
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         {showDatePicker && (
           <DateTimePicker
             value={formData.data_exame}
             mode="date"
+<<<<<<< HEAD
+=======
+            display="default"
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
             onChange={(event, selectedDate) => {
               setShowDatePicker(false);
               if (selectedDate) {
@@ -824,6 +996,7 @@ export default function CadastroExameScreen() {
             }}
           />
         )}
+<<<<<<< HEAD
 
         {/* MODAL UNIVERSAL */}
         <Modal
@@ -890,6 +1063,8 @@ export default function CadastroExameScreen() {
             </View>
           </Pressable>
         </Modal>
+=======
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -908,8 +1083,14 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   
+<<<<<<< HEAD
+=======
+  // HEADER COM COR SÓLIDA (SEM LOGO)
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   header: {
-    paddingVertical: 30,
+    backgroundColor: '#8B0000', 
+    paddingTop: 15,
+    paddingBottom: 20, 
     paddingHorizontal: 20,
     alignItems: 'center',
     borderBottomLeftRadius: 30,
@@ -920,6 +1101,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
+<<<<<<< HEAD
   headerTop: {
     width: '100%',
     alignItems: 'flex-end',
@@ -930,17 +1112,19 @@ const styles = StyleSheet.create({
     height: 70,
     tintColor: '#FFF',
   },
+=======
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   headerIconContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 60, 
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8, 
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22, 
     fontWeight: 'bold',
     color: '#FFF',
     letterSpacing: 1,
@@ -951,6 +1135,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+<<<<<<< HEAD
+=======
+  // FORMULÁRIO
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   formCard: {
     backgroundColor: '#FFF',
     margin: 16,
@@ -1018,6 +1206,10 @@ const styles = StyleSheet.create({
     color: '#999',
   },
 
+<<<<<<< HEAD
+=======
+  // PDF SECTION
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   pdfSection: {
     marginTop: 10,
     marginBottom: 20,
@@ -1101,6 +1293,10 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
+<<<<<<< HEAD
+=======
+  // UPLOADING
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   uploadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1117,6 +1313,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+<<<<<<< HEAD
+=======
+  // SAVE BUTTON
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1144,6 +1344,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
+<<<<<<< HEAD
+=======
+  // LOADING
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1156,6 +1360,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 
+<<<<<<< HEAD
+=======
+  // MODAL DE SELEÇÃO
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   selectModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1193,6 +1401,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+<<<<<<< HEAD
   customOptionText: {
     color: '#8B0000',
     fontWeight: 'bold',
@@ -1239,22 +1448,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
+=======
+
+  // MODAL GLOBAL
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContainerGlobal: {
-    padding: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
   modalContentGlobal: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 30,
-    width: '100%',
+    width: '85%',
     maxWidth: 400,
     alignItems: 'center',
     shadowColor: '#000',

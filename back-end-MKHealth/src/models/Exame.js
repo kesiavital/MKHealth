@@ -7,12 +7,12 @@ const Exame = sequelize.define('Exame', {
     primaryKey: true,
     autoIncrement: true
   },
-  paciente_nome: {
-    type: DataTypes.STRING(200),
+  paciente_id: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [3, 200]
+    references: {
+      model: 'usuarios', 
+      key: 'id'
     }
   },
   tipo_exame: {
@@ -51,7 +51,6 @@ const Exame = sequelize.define('Exame', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  // Campos para armazenar informações do PDF
   pdf_filename: {
     type: DataTypes.STRING(500),
     allowNull: true
@@ -78,4 +77,9 @@ const Exame = sequelize.define('Exame', {
   underscored: true
 });
 
+// Exporta PRIMEIRO
 module.exports = Exame;
+
+// Importa e associa DEPOIS (usando um nome diferente para evitar conflito)
+const UsuarioModel = require('./Usuario');
+Exame.belongsTo(UsuarioModel, { foreignKey: 'paciente_id', as: 'paciente' });

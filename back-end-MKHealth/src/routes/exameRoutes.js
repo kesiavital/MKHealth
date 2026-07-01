@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // routes/examesRoutes.js
 const express = require("express");
 const routes = express.Router();
@@ -5,6 +6,13 @@ const routes = express.Router();
 const exameController = require("../controllers/ExameController");
 const uploadConfig = require("../config/upload");
 const { authMiddleware } = require("../middlewares/auth");
+=======
+const express = require('express');
+const router = express.Router();
+//const auth = require('../middlewares/authMiddleware');//
+const exameController = require('../controllers/ExameController');
+const { upload } = require('../config/upload');
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
 // Pega o upload do config
 const { upload } = uploadConfig;
@@ -28,11 +36,17 @@ routes.get("/stats", authMiddleware, exameController.estatisticas);
 routes.get("/paciente/:nome", authMiddleware, exameController.buscarPorPaciente);
 routes.get("/buscar/:nome", authMiddleware, exameController.buscarPorPaciente);
 
+<<<<<<< HEAD
 // ===============================
 // ROTAS PRINCIPAIS (PROTEGIDAS)
 // ===============================
 routes.post("/", authMiddleware, upload.single("pdf"), exameController.criar);
 routes.get("/", authMiddleware, exameController.listar);
+=======
+router.get('/',exameController.listar); 
+
+router.get('/periodo', exameController.buscarPorPeriodo);
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
 // ===============================
 // 🔥 ROTA PDF - SEM AUTENTICAÇÃO (PÚBLICA)

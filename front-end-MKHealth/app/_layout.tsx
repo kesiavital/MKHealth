@@ -23,7 +23,7 @@ function CustomDrawerContent(props: any) {
   const carregarUsuario = async () => {
     const data = await getUserData();
     setUserData(data);
-    console.log('📱 Dados do usuário no drawer:', data);
+    console.log('Dados do usuário no drawer:', data);
   };
 
   const handleLogout = async () => {
@@ -129,7 +129,7 @@ function CustomDrawerContent(props: any) {
                 source={{ uri: fotoUrl }} 
                 style={styles.avatarImage}
                 onError={(e) => {
-                  console.log('❌ Drawer: Erro ao carregar foto:', e.nativeEvent.error);
+                  console.log('Drawer: Erro ao carregar foto:', e.nativeEvent.error);
                 }}
               />
             ) : (
@@ -218,9 +218,9 @@ function CustomDrawerContent(props: any) {
           <>
             <View style={styles.divider} />
             
-            <Text style={styles.adminSectionTitle}>🔐 Administração</Text>
+            <Text style={styles.adminSectionTitle}> Administração</Text>
             
-            {/* 🔥 SÓ O GERENCIAR USUÁRIO, REMOVIDO O ADMIN */}
+            {/* SÓ O GERENCIAR USUÁRIO, REMOVIDO O ADMIN */}
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => navigateTo('/admin/RegisterScreen')}
@@ -261,7 +261,7 @@ export default function RootLayout() {
   const verificarAutenticacao = useCallback(async () => {
     try {
       const authStatus = await isAuthenticated();
-      console.log('🔐 Estado de autenticação:', authStatus ? 'Logado' : 'Não logado');
+      console.log('Estado de autenticação:', authStatus ? 'Logado' : 'Não logado');
       setIsAuthenticatedState(authStatus);
     } catch (error) {
       console.error('Erro ao verificar autenticação:', error);
@@ -290,10 +290,10 @@ export default function RootLayout() {
     );
   }
 
-  const publicRoutes = ['/login', '/recuperarSenha'];
+  const publicRoutes = ['/login', '/recuperarSenha', '/cadastro'];
 
   if (!isAuthenticatedState && !publicRoutes.includes(pathname)) {
-    console.log('🚀 Redirecionando para login...');
+    console.log(' Redirecionando para login...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Redirect href="/login" />
@@ -302,7 +302,7 @@ export default function RootLayout() {
   }
 
   if (isAuthenticatedState && publicRoutes.includes(pathname)) {
-    console.log('🚀 Usuário logado, redirecionando para home...');
+    console.log(' Usuário logado, redirecionando para home...');
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Redirect href="/(tabs)" />
@@ -310,7 +310,7 @@ export default function RootLayout() {
     );
   }
 
-  // 🔥 LAYOUT ÚNICO PARA TODAS AS ROTAS
+  //  LAYOUT ÚNICO PARA TODAS AS ROTAS
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ExamesProvider>
@@ -337,10 +337,10 @@ export default function RootLayout() {
           {/* ROTAS OCULTAS */}
           <Drawer.Screen name="login" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="recuperarSenha" options={{ drawerItemStyle: { display: 'none' } }} />
+          <Drawer.Screen name="cadastro" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="index" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="admin" options={{ drawerItemStyle: { display: 'none' } }} />
           <Drawer.Screen name="modal" options={{ drawerItemStyle: { display: 'none' } }} />
-          <Drawer.Screen name="esqueci" options={{ drawerItemStyle: { display: 'none' } }} />
         </Drawer>
       </ExamesProvider>
     </GestureHandlerRootView>

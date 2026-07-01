@@ -37,11 +37,27 @@ const Usuario = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
+    // Novas colunas adicionadas para o fluxo de recuperação de senha
+    codigo_recuperacao: {
+      type: DataTypes.STRING(6),
+      allowNull: true,
+      defaultValue: null,
+    },
+    codigo_expiracao: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     tableName: "usuarios",
-    timestamps: false, // MANTENHA COMO FALSE
+    timestamps: false,
   }
 );
 
+// Exporta PRIMEIRO
 module.exports = Usuario;
+
+// Importa e associa DEPOIS (usando um nome diferente para evitar conflito)
+const ExameModel = require('./Exame');
+Usuario.hasMany(ExameModel, { foreignKey: 'paciente_id', as: 'exames' });

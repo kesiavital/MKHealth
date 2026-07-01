@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // 🔥 STATES DOS MODAIS
+  //  STATES DOS MODAIS
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTipo, setModalTipo] = useState<'sucesso' | 'erro' | 'info' | 'confirmacao'>('info');
   const [modalTitulo, setModalTitulo] = useState('');
@@ -47,7 +47,7 @@ export default function LoginScreen() {
     return cpf.replace(/\D/g, '');
   };
 
-  // 🔥 FUNÇÕES PARA ABRIR MODAIS
+  //  FUNÇÕES PARA ABRIR MODAIS
   const abrirModal = (
     tipo: 'sucesso' | 'erro' | 'info' | 'confirmacao',
     titulo: string,
@@ -75,19 +75,43 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Validação CPF
     if (!cpf.trim()) {
+<<<<<<< HEAD
       abrirModal('erro', '⚠️ Campo Vazio', 'Por favor, digite seu CPF para continuar.');
+=======
+      abrirModal(
+        'erro',
+        'Campo Vazio',
+        'Por favor, digite seu CPF para continuar.'
+      );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
     const cpfLimpo = limparCPF(cpf);
     if (cpfLimpo.length !== 11) {
+<<<<<<< HEAD
       abrirModal('erro', '📄 CPF Inválido', 'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00');
+=======
+      abrirModal(
+        'erro',
+        'CPF Inválido',
+        'O CPF deve conter 11 números.\n\nExemplo: 123.456.789-00'
+      );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
     // Validação Senha
     if (!password.trim()) {
+<<<<<<< HEAD
       abrirModal('erro', '🔒 Campo Vazio', 'Por favor, digite sua senha para continuar.');
+=======
+      abrirModal(
+        'erro',
+        ' Campo Vazio',
+        'Por favor, digite sua senha para continuar.'
+      );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
       return;
     }
 
@@ -95,9 +119,13 @@ export default function LoginScreen() {
 
     try {
       const loginUrl = `${USUARIOS_URL}/login`;
+<<<<<<< HEAD
       console.log('📡 ====== INICIANDO LOGIN ======');
       console.log('📡 URL:', loginUrl);
       console.log('📡 CPF:', cpfLimpo);
+=======
+      console.log(' ====== INICIANDO LOGIN ======');
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
       // ===== 1. FAZ REQUISIÇÃO PARA O BACKEND =====
       const response = await fetch(loginUrl, {
@@ -113,14 +141,18 @@ export default function LoginScreen() {
       });
 
       const data = await response.json();
+<<<<<<< HEAD
       console.log('📡 Resposta status:', response.status);
       console.log('📡 Resposta data:', JSON.stringify(data, null, 2));
+=======
+      console.log('Resposta:', JSON.stringify(data, null, 2));
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
 
       // ===== 2. TRATAMENTO DE ERROS =====
       if (response.status === 404) {
         abrirModal(
           'erro',
-          '🔍 Usuário não encontrado',
+          'Usuário não encontrado',
           'Não encontramos um usuário com este CPF.\n\nVerifique o CPF informado e tente novamente.',
           'Tentar Novamente',
           undefined,
@@ -136,7 +168,7 @@ export default function LoginScreen() {
       if (response.status === 401) {
         abrirModal(
           'erro',
-          '🔒 Senha incorreta',
+          'Senha incorreta',
           'A senha informada está incorreta.\n\nVerifique sua senha e tente novamente.',
           'Tentar Novamente',
           undefined,
@@ -150,15 +182,31 @@ export default function LoginScreen() {
       }
 
       if (!response.ok) {
+<<<<<<< HEAD
         abrirModal('erro', '❌ Erro no Login', data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.');
+=======
+        abrirModal(
+          'erro',
+          'Erro no Login',
+          data.erro || 'Ocorreu um erro ao fazer login. Tente novamente.'
+        );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
 
       // ===== 3. VERIFICA SE VEIO O TOKEN =====
       if (!data.token || !data.usuario) {
+<<<<<<< HEAD
         console.error('❌ Dados incompletos:', data);
         abrirModal('erro', '❌ Resposta Inválida', 'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.');
+=======
+        abrirModal(
+          'erro',
+          ' Resposta Inválida',
+          'O servidor retornou uma resposta inválida.\n\nTente novamente mais tarde.'
+        );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -175,7 +223,15 @@ export default function LoginScreen() {
       const salvou = await saveUserData(data.token, data.usuario);
       
       if (!salvou) {
+<<<<<<< HEAD
         abrirModal('erro', '❌ Erro ao Salvar', 'Não foi possível salvar seus dados localmente.');
+=======
+        abrirModal(
+          'erro',
+          'Erro ao Salvar',
+          'Não foi possível salvar seus dados localmente.\n\nVerifique o armazenamento do dispositivo.'
+        );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -184,6 +240,7 @@ export default function LoginScreen() {
       const tokenSalvo = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
       const userSalvo = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
       
+<<<<<<< HEAD
       console.log('🔍 Verificação final:');
       console.log('📌 Token salvo?', !!tokenSalvo);
       console.log('📌 Token:', tokenSalvo?.substring(0, 30) + '...');
@@ -193,6 +250,19 @@ export default function LoginScreen() {
       if (!tokenSalvo || !userSalvo) {
         console.error('❌ Falha na verificação dos dados salvos!');
         abrirModal('erro', '❌ Erro ao Salvar', 'Erro ao salvar seus dados. Tente novamente.');
+=======
+      console.log(' Verificação final antes de redirecionar:');
+      console.log(' Token existe?', !!tokenFinal);
+      console.log(' UserData existe?', !!userFinal);
+
+      if (!tokenFinal || !userFinal) {
+        console.error('Dados sumiram!');
+        abrirModal(
+          'erro',
+          'Erro ao Salvar',
+          'Erro ao salvar seus dados. Tente novamente.'
+        );
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         setLoading(false);
         return;
       }
@@ -206,21 +276,30 @@ export default function LoginScreen() {
       
       abrirModal(
         'sucesso',
-        '✅ Login Realizado!',
+        'Login Realizado!',
         `Bem-vindo ${data.usuario.nome_completo || 'Usuário'}!\n\n👤 Tipo: ${tipoDescricao}`,
         'ENTRAR',
         () => {
+<<<<<<< HEAD
           console.log('🚀 NAVEGANDO PARA HOME...');
+=======
+          console.log('REDIRECIONANDO PARA HOME...');
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
           router.replace('/(tabs)');
         }
       );
       
     } catch (error: any) {
-      console.error('❌ ERRO no login:', error);
+      console.error('ERRO no login:', error);
       abrirModal(
         'erro',
+<<<<<<< HEAD
         '❌ Erro de Conexão',
         `Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet.\n\nDetalhe: ${error.message || 'Erro desconhecido'}`,
+=======
+        'Erro de Conexão',
+        'Não foi possível conectar ao servidor.\n\nVerifique sua conexão com a internet e tente novamente.',
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         'Tentar Novamente'
       );
     } finally {
@@ -239,7 +318,11 @@ export default function LoginScreen() {
     router.push('/recuperarSenha');
   };
 
-  // 🔥 RENDERIZAR ÍCONE DO MODAL
+  const navigateToPublicRegister = () => {
+    router.push('/cadastro');
+  };
+
+  //  RENDERIZAR ÍCONE DO MODAL
   const renderModalIcon = () => {
     switch (modalTipo) {
       case 'sucesso':
@@ -285,8 +368,7 @@ export default function LoginScreen() {
             source={require('../assets/images/logomk.png')}
             style={styles.logo}
           />
-          <Text style={styles.logoText}>MKHealth</Text>
-          <Text style={styles.logoSubtext}>Sistema de Exames</Text>
+        
         </View>
 
         <View style={styles.card}>
@@ -343,6 +425,7 @@ export default function LoginScreen() {
           >
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </TouchableOpacity>
+<<<<<<< HEAD
 
           {/* 🔥 CADASTRE-SE - IGUAL AO ESQUECI SENHA */}
           <TouchableOpacity
@@ -352,17 +435,28 @@ export default function LoginScreen() {
           >
             <Text style={styles.registerTextLink}>Não tem uma conta? Cadastre-se</Text>
           </TouchableOpacity>
+=======
+          
+          {/* BOTAO CADASTRO */}
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>Não tem uma conta? </Text>
+            <TouchableOpacity onPress={navigateToPublicRegister} disabled={loading}>
+              <Text style={styles.registerLink}>Cadastre-se</Text>
+            </TouchableOpacity>
+          </View>
+          
+>>>>>>> ca59470826de58cca0d79539a784bf4e81cefc68
         </View>
       </View>
 
-      {/* 🔥 MODAL UNIVERSAL */}
+      {/* MODAL UNIVERSAL */}
       <Modal
         animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={fecharModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={fecharModal}>
+       <Pressable style={styles.modalOverlay} onPress={fecharModal}>
           <View style={styles.modalContainer}>
             <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
               <View style={styles.modalIconContainer}>
@@ -443,14 +537,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 20,
+    marginTop: -30,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginTop: 40,      // Empurra a logo um pouco mais para baixo
+    marginBottom: 15,   // Reduzir esse valor puxa o card para cima, mais perto da logo
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 160,
+    height: 160,
     resizeMode: 'contain',
     tintColor: '#FFF',
   },
@@ -571,7 +667,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // 🔥 ESTILOS DO MODAL
+  // ESTILOS DO MODAL
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
