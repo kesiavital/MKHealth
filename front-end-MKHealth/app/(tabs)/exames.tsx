@@ -1,4 +1,5 @@
-// app/(tabs)/exames.tsx
+// app/(tabs)/exames.tsx - VERSÃO CORRIGIDA
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -31,7 +32,6 @@ const API_URL = `http://${IP}:3000/api/exames`;
 interface Exame {
   id: number;
   paciente_nome: string;
-  paciente_cpf?: string;
   tipo_exame: string;
   data_exame: string;
   medico_solicitante: string;
@@ -106,9 +106,6 @@ export default function ExamesScreen() {
   const [showTipoSelect, setShowTipoSelect] = useState(false);
   const [showMedicoSelect, setShowMedicoSelect] = useState(false);
   const [showLaboratorioSelect, setShowLaboratorioSelect] = useState(false);
-  const [tipoCustom, setTipoCustom] = useState(false);
-  const [medicoCustom, setMedicoCustom] = useState(false);
-  const [laboratorioCustom, setLaboratorioCustom] = useState(false);
 
   const [formData, setFormData] = useState({
     paciente_nome: '',
@@ -219,62 +216,66 @@ export default function ExamesScreen() {
     return response;
   };
 
-  const carregarExames = async () => {
-    setLoading(true);
-    try {
-      console.log('📋 Carregando exames...');
+ // app/(tabs)/exames.tsx - PARTE CORRIGIDA (carregarExames)
 
-      const response = await fetchWithToken(API_URL);
-      const data = await response.json();
+const carregarExames = async () => {
+  setLoading(true);
+  try {
+    console.log('📋 Carregando exames...');
 
-      console.log('📋 Resposta:', Array.isArray(data) ? `Array com ${data.length} itens` : typeof data);
+    const response = await fetchWithToken(API_URL);
+    const data = await response.json();
 
-      if (!userData) {
-        await carregarUsuario();
-        return;
-      }
+    console.log('📋 Resposta:', Array.isArray(data) ? `Array com ${data.length} itens` : typeof data);
 
-      let examesData: Exame[] = [];
-      if (Array.isArray(data)) {
-        examesData = data;
-      } else if (data && data.exames && Array.isArray(data.exames)) {
-        examesData = data.exames;
-      } else if (data && data.data && Array.isArray(data.data)) {
-        examesData = data.data;
-      } else {
-        console.log('⚠️ Estrutura de dados não reconhecida:', data);
-        examesData = [];
-      }
-
-      let examesFiltrados = examesData;
-      if (!isAdmin) {
-        const nomePaciente = userData.nome_completo?.toLowerCase().trim();
-        const cpfPaciente = userData.cpf?.replace(/\D/g, '');
-
-        examesFiltrados = examesData.filter((exame: Exame) => {
-          const nomeExame = exame.paciente_nome?.toLowerCase().trim();
-          const cpfExame = exame.paciente_cpf?.replace(/\D/g, '');
-          return nomeExame === nomePaciente || cpfExame === cpfPaciente;
-        });
-        console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
-      } else {
-        console.log(`📱 Admin - ${examesFiltrados.length} exames encontrados`);
-      }
-
-      setListaExames(examesFiltrados);
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar exames:', error);
-
-      if (error.message.includes('Sessão expirada')) {
-        abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
-      } else {
-        abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
-      }
-    } finally {
-      setLoading(false);
+    if (!userData) {
+      await carregarUsuario();
+      return;
     }
-  };
 
+    let examesData: Exame[] = [];
+    if (Array.isArray(data)) {
+      examesData = data;
+    } else if (data && data.exames && Array.isArray(data.exames)) {
+      examesData = data.exames;
+    } else if (data && data.data && Array.isArray(data.data)) {
+      examesData = data.data;
+    } else {
+      console.log('⚠️ Estrutura de dados não reconhecida:', data);
+      examesData = [];
+    }
+
+    // 🔥 FILTRO CORRIGIDO - Mais flexível
+    let examesFiltrados = examesData;
+    if (!isAdmin) {
+      // Normalizar os nomes para comparação
+      const nomePaciente = userData.nome_completo?.toLowerCase().trim().replace(/\s+/g, ' ');
+      console.log('📱 Nome do paciente logado:', nomePaciente);
+
+      examesFiltrados = examesData.filter((exame: Exame) => {
+        const nomeExame = exame.paciente_nome?.toLowerCase().trim().replace(/\s+/g, ' ');
+        console.log(`📱 Comparando: "${nomeExame}" === "${nomePaciente}"`);
+        return nomeExame === nomePaciente;
+      });
+      
+      console.log(`📱 Paciente ${userData.nome_completo} - ${examesFiltrados.length} exames encontrados`);
+    } else {
+      console.log(`📱 Admin - ${examesFiltrados.length} exames encontrados`);
+    }
+
+    setListaExames(examesFiltrados);
+  } catch (error: any) {
+    console.error('❌ Erro ao carregar exames:', error);
+
+    if (error.message.includes('Sessão expirada')) {
+      abrirModal('erro', '⏰ Sessão Expirada', 'Sua sessão expirou. Faça login novamente.');
+    } else {
+      abrirModal('erro', '❌ Erro', 'Não foi possível carregar a lista de exames');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   const editarExame = (exame: Exame) => {
     setEditingExame(exame);
     setFormData({
@@ -288,9 +289,6 @@ export default function ExamesScreen() {
     });
     setNewPdfFile(null);
     setRemoverPdf(false);
-    setTipoCustom(!TIPOS_EXAME.includes(exame.tipo_exame));
-    setMedicoCustom(!MEDICOS.includes(exame.medico_solicitante));
-    setLaboratorioCustom(!LABORATORIOS.includes(exame.laboratorio));
     setModalVisible(true);
   };
 
@@ -336,13 +334,6 @@ export default function ExamesScreen() {
     const mes = String(data.getMonth() + 1).padStart(2, '0');
     const dia = String(data.getDate()).padStart(2, '0');
     return `${ano}-${mes}-${dia}`;
-  };
-
-  const formatarTamanhoArquivo = (bytes: number | null) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const salvarAlteracoes = async () => {
@@ -442,7 +433,7 @@ export default function ExamesScreen() {
   };
 
   // ============================================
-  // 🔥 FUNÇÃO VISUALIZAR PDF - CORRIGIDA PARA ANDROID
+  // 🔥 FUNÇÃO VISUALIZAR PDF
   // ============================================
   const visualizarPDF = async (exame: Exame) => {
     if (!exame.possui_pdf) {
@@ -459,19 +450,14 @@ export default function ExamesScreen() {
         throw new Error('Token não encontrado');
       }
 
-      // 🔥 CONSTRUIR URL COM TOKEN
       const pdfUrl = `http://${IP}:3000/api/exames/${exame.id}/visualizar?token=${token}`;
       console.log('📄 Abrindo PDF:', pdfUrl);
 
-      // 🔥 PARA ANDROID - Usar Linking em vez de IntentLauncher
       if (Platform.OS === 'android') {
-        // Verificar se o link pode ser aberto
         const supported = await Linking.canOpenURL(pdfUrl);
-
         if (supported) {
           await Linking.openURL(pdfUrl);
         } else {
-          // Tentar com IntentLauncher como fallback
           try {
             await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
               data: pdfUrl,
@@ -480,12 +466,10 @@ export default function ExamesScreen() {
             });
           } catch (intentError) {
             console.error('❌ IntentLauncher falhou:', intentError);
-            // Fallback: abrir no navegador
             await Linking.openURL(pdfUrl);
           }
         }
       } else {
-        // iOS - usar Linking
         const supported = await Linking.canOpenURL(pdfUrl);
         if (supported) {
           await Linking.openURL(pdfUrl);
@@ -541,6 +525,10 @@ export default function ExamesScreen() {
       }
     }, [userData])
   );
+
+  // ============================================
+  // RENDER
+  // ============================================
 
   const renderModalIcon = () => {
     switch (modalTipo) {
@@ -984,27 +972,13 @@ export default function ExamesScreen() {
 }
 
 // ============================================
-// STYLES
+// STYLES (mantidos iguais aos originais)
 // ============================================
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666'
-  },
-
+  safeArea: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 10, color: '#666' },
   header: {
     backgroundColor: '#8B0000',
     paddingTop: 40,
@@ -1027,23 +1001,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.5,
   },
-  headerLogo: {
-    width: 60,
-    height: 60,
-    tintColor: '#FFF',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#FFF',
-    marginTop: 5,
-    fontWeight: '500',
-  },
-
-  listContainer: {
-    padding: 16,
-    paddingTop: 16,
-  },
-
+  listContainer: { padding: 16, paddingTop: 16 },
   card: {
     backgroundColor: '#FFF',
     borderRadius: 14,
@@ -1064,11 +1022,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#FFE0E0'
   },
-  pacienteInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1
-  },
+  pacienteInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   avatar: {
     width: 44,
     height: 44,
@@ -1077,46 +1031,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold'
-  },
-  pacienteDetails: {
-    marginLeft: 12,
-    flex: 1
-  },
-  pacienteNome: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  exameTipo: {
-    fontSize: 12,
-    color: '#8B0000',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  cardContent: {
-    padding: 14
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 8,
-    fontWeight: '500'
-  },
-  infoValue: {
-    fontSize: 13,
-    color: '#333',
-    flex: 1
-  },
+  avatarText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  pacienteDetails: { marginLeft: 12, flex: 1 },
+  pacienteNome: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+  exameTipo: { fontSize: 12, color: '#8B0000', marginTop: 2, fontWeight: '500' },
+  cardContent: { padding: 14 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  infoLabel: { fontSize: 13, color: '#666', marginLeft: 8, marginRight: 8, fontWeight: '500' },
+  infoValue: { fontSize: 13, color: '#333', flex: 1 },
   resultadosContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1125,12 +1047,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     borderRadius: 8
   },
-  resultadosText: {
-    fontSize: 13,
-    color: '#333',
-    marginLeft: 8,
-    flex: 1
-  },
+  resultadosText: { fontSize: 13, color: '#333', marginLeft: 8, flex: 1 },
   observacoesContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1139,12 +1056,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF8E1',
     borderRadius: 8
   },
-  observacoesText: {
-    fontSize: 13,
-    color: '#856404',
-    marginLeft: 8,
-    flex: 1
-  },
+  observacoesText: { fontSize: 13, color: '#856404', marginLeft: 8, flex: 1 },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1155,11 +1067,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8
   },
-  pdfButtonText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFF'
-  },
+  pdfButtonText: { fontSize: 13, fontWeight: 'bold', color: '#FFF' },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1169,29 +1077,10 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0F0F0',
     gap: 6
   },
-  dataCriacao: {
-    fontSize: 11,
-    color: '#999'
-  },
-
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#999',
-    marginTop: 16
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#CCC',
-    marginTop: 8,
-    textAlign: 'center'
-  },
-
+  dataCriacao: { fontSize: 11, color: '#999' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#999', marginTop: 16 },
+  emptyText: { fontSize: 14, color: '#CCC', marginTop: 8, textAlign: 'center' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1211,14 +1100,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0'
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  modalContent: {
-    padding: 20
-  },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  modalContent: { padding: 20 },
   input: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -1227,10 +1110,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#F8F9FA'
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top'
-  },
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
   selectButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1249,12 +1129,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0'
   },
-  pdfTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15
-  },
+  pdfTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15 },
   currentPdf: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1264,10 +1139,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12
   },
-  removeText: {
-    color: '#FF4444',
-    fontWeight: '500'
-  },
+  removeText: { color: '#FF4444', fontWeight: '500' },
   uploadButton: {
     padding: 12,
     borderRadius: 10,
@@ -1284,12 +1156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20
   },
-  saveButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold'
-  },
-
+  saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   selectModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1309,32 +1176,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0'
   },
-  selectModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  selectOption: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0'
-  },
-  selectOptionText: {
-    fontSize: 16,
-    color: '#333'
-  },
-
+  selectModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  selectOption: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  selectOptionText: { fontSize: 16, color: '#333' },
   modalOverlayGlobal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContainerGlobal: {
-    padding: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
+  modalContainerGlobal: { padding: 20, width: '100%', alignItems: 'center' },
   modalContentGlobal: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,

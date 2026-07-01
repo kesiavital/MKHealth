@@ -1,3 +1,5 @@
+// models/Usuario.js
+
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
@@ -37,17 +39,7 @@ const Usuario = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
-    // Novas colunas adicionadas para o fluxo de recuperação de senha
-    codigo_recuperacao: {
-      type: DataTypes.STRING(6),
-      allowNull: true,
-      defaultValue: null,
-    },
-    codigo_expiracao: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: null,
-    },
+    // 🔥 COLUNAS REMOVIDAS - codigo_recuperacao e codigo_expiracao
   },
   {
     tableName: "usuarios",
